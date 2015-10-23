@@ -11,6 +11,12 @@
 			background-color: #fff;
 			border: 1px solid #ccc;
 		}
+		#table {
+			width: 100%;
+		}
+		#table .cell {
+			display: inline-block;
+		}
 		.background {
 			fill: none;
 			pointer-events: all;
@@ -48,8 +54,24 @@
 </head>
 <body>
 	<div id="map"></div>
+	<div id="table"></div>
 	<script type="text/javascript">
+	  // some function to manipulate other elements 
+		var updateTable = function(data){
+			var $table = $('#table');
+			$table.empty();
+			$.each(data,function(key, value){
+				var domStr = '';
+				domStr += "<div class='row'>"
+				domStr += "<div class='cell key'>" + key + "</div>"
+				domStr += "<div class='cell key'>" + value + "</div>"
+				domStr += "</div>"
+				$table.append(domStr);
+			})
+		};
+
 		var dataObj = {};
+		// dont need. Just run the onclick function on init. 
 		$.ajax({
 			url: "/geodata",
 			data: {zoom: 'world'},
@@ -58,6 +80,7 @@
 				// data = {'San Francisco': 4, 'Los Angeles': 10, 'San Diego': 3}
 				choropleth.insert(data, {zoom: 'world'});
 				choropleth.render({zoom: 'world'});
+				updateTable(data);
 			}
 		});
 
@@ -68,6 +91,7 @@
 			onClick: function(selection){
 				// {zoom: 'state', country: 'USA', state: 'CA'}
 				if(choropleth.get(selection)){
+					
 					choropleth.render(selection);
 				} else {
 					$.ajax({
@@ -78,6 +102,7 @@
 							// data = {'San Francisco': 4, 'Los Angeles': 10, 'San Diego': 3}
 							choropleth.insert(data, selection);
 							choropleth.render(selection);
+							updateTable(data)
 						}
 					});
 				};

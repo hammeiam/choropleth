@@ -8,7 +8,9 @@
 		this.mapSelector = config.mapSelector;
 		this.dataStore = config.dataStore;
 		this.projection = d3.geo.mercator().scale(150);
-		this.path = d3.geo.path().projection(this.projection);
+		this.path = function(){
+			return d3.geo.path().projection(this.projection)
+		}.bind(this);
 		this.firstRender = true;
 		
 
@@ -21,7 +23,7 @@
 					this.currentFeature = {
 						id: featureData.id,
 						name: featureData.name,
-						bounds: this.path.bounds(featureData)
+						bounds: this.path().bounds(featureData)
 					};
 					break;
 				case 'country':
@@ -30,10 +32,10 @@
 					this.currentFeature = {
 						id: featureData.id,
 						name: featureData.name,
-						bounds: this.path.bounds(featureData)
+						bounds: this.path().bounds(featureData)
 					};
 					break;
-				case 'state':
+				default:
 					newSelection = { zoom:'world' };
 					break;
 			};
@@ -77,7 +79,8 @@
 				svg.append("rect")
 				.attr("class", "background")
 				.attr("width", width)
-				.attr("height", height);
+				.attr("height", height)
+				.on("click", self.onClick);
 				self.g = svg.append("g");
 
 				$(window).resize(function() {
@@ -95,8 +98,12 @@
 				case 'world':
 					beforeRender = function(){
 						self.projection = d3.geo.mercator().scale(150).translate([width / 2, height / 1.5]);
-						self.path = d3.geo.path().projection(self.projection);
+						// self.path = d3.geo.path().projection(self.projection);
 					};
+					afterRender = function(){
+						var xyz = [width / 2, height / 1.5, 1];
+						self.g.attr("transform", "translate(" + self.projection.translate() + ")scale(" + xyz[2] + ")translate(-" + xyz[0] + ",-" + xyz[1] + ")")
+					}
 					filePath = "geodata/countries.topo.json";
 					id = "countries";
 					features = function(topoData){return topojson.feature(topoData, topoData.objects.countries).features};
@@ -106,15 +113,18 @@
 					if(country === 'USA'){
 						beforeRender = function(){
 							self.projection = d3.geo.albersUsa()
-							.scale(800).translate([width / 2, height / 2]);
-							self.path = d3.geo.path().projection(self.projection);
+							.scale(1000).translate([width / 2, height / 2]);
 						}
 					} else if(country === 'RUS'){
 						// make sure that the country isn't split on 2 sides of the map somehow
 						beforeRender = function(){
 							var xyz = getXYZ(self.currentFeature.bounds, width, height);
-							self.projection.translate(["-" + xyz[0],"-" + xyz[1]]);
-							self.path = d3.geo.path().projection(self.projection);
+							self.projection = d3.geo.albers()
+								.rotate([-105, 0])
+							  .center([-10, 59])
+							  .parallels([52, 64])
+							  .scale(700)
+							  .translate([width / 2, height / 2]);
 						}
 						afterRender = function(){
 							var xyz = getXYZ(self.currentFeature.bounds, width, height);
@@ -142,7 +152,7 @@
 						.selectAll(["#countries", "#states", "#cities"])
 						.style("stroke-width", 1.0 / xyz[2] + "px")
 						.selectAll(".city")
-						.attr("d", self.path.pointRadius(10.0 / xyz[2]));
+						.attr("d", self.path().pointRadius(10.0 / xyz[2]));
 					}
 					filePath = "geodata/" + country + "/" + state + "_cities.topo.json";
 					id = "cities";
@@ -153,7 +163,8 @@
 
 				d3.json(filePath, function(error, topoData) {
 					if (error) return console.error(error);
-					beforeRender()
+					beforeRender();
+
 					self.g.select("g").remove();
 					self.g.append("g")
 					.attr("id", id)
@@ -162,9 +173,10 @@
 					.enter()
 					.append("path")
 					.attr("id", function(d) { return d.id || d.properties.name; })
-					.attr("class", function(d) { return className + d.id ? fill(getValue(d.id)) : '';  })
-					.attr("d", self.path)
+					.attr("class", function(d) { return className + (d.id ? fill(getValue(d.id)) : '');  })
+					.attr("d", self.path())
 					.on("click", self.onClick);
+
 					afterRender();
 				});
 				self.firstRender = false;
