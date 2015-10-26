@@ -61,38 +61,30 @@
 			var $table = $('#table');
 			$table.empty();
 			$.each(data,function(key, value){
+				// USA: {value: 1, children: {}}
+				console.log(key, value)
+				if(!value['value']){ return; }
 				var domStr = '';
 				domStr += "<div class='row'>"
 				domStr += "<div class='cell key'>" + key + "</div>"
-				domStr += "<div class='cell key'>" + value + "</div>"
+				domStr += "<div class='cell value'>" + value['value'] + "</div>"
 				domStr += "</div>"
 				$table.append(domStr);
 			})
 		};
 
 		var dataObj = {};
-		// dont need. Just run the onclick function on init. 
-		$.ajax({
-			url: "/geodata",
-			data: {zoom: 'world'},
-			dataType: 'json',
-			success: function(data){
-				// data = {'San Francisco': 4, 'Los Angeles': 10, 'San Diego': 3}
-				choropleth.insert(data, {zoom: 'world'});
-				choropleth.render({zoom: 'world'});
-				updateTable(data);
-			}
-		});
 
-
-		var choropleth = new Choropleth({
+		var choropleth = new Choropleth()
+		choropleth.init({
 			mapSelector: '#map',
 			dataStore: dataObj, 
 			onClick: function(selection){
 				// {zoom: 'state', country: 'USA', state: 'CA'}
-				if(choropleth.get(selection)){
-					
+				var info = choropleth.get(selection);
+				if(info){
 					choropleth.render(selection);
+					updateTable(info);
 				} else {
 					$.ajax({
 						url: "/geodata",
@@ -102,7 +94,7 @@
 							// data = {'San Francisco': 4, 'Los Angeles': 10, 'San Diego': 3}
 							choropleth.insert(data, selection);
 							choropleth.render(selection);
-							updateTable(data)
+							updateTable(choropleth.get(selection));
 						}
 					});
 				};
