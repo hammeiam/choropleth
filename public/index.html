@@ -75,15 +75,15 @@
 
 		var dataObj = {};
 
-		var choropleth = new Choropleth()
-		choropleth.init({
+		var choropleth = new Choropleth({
 			mapSelector: '#map',
 			dataStore: dataObj, 
 			onClick: function(selection){
 				// {zoom: 'state', country: 'USA', state: 'CA'}
-				var info = choropleth.get(selection);
+				var self = this;
+				var info = self.get(selection);
 				if(info){
-					choropleth.render(selection);
+					self.render(selection);
 					updateTable(info);
 				} else {
 					$.ajax({
@@ -92,9 +92,9 @@
 						dataType: 'json',
 						success: function(data){
 							// data = {'San Francisco': 4, 'Los Angeles': 10, 'San Diego': 3}
-							choropleth.insert(data, selection);
-							choropleth.render(selection);
-							updateTable(choropleth.get(selection));
+							self.insert(data, selection);
+							self.render(selection);
+							updateTable(self.get(selection));
 						}
 					});
 				};

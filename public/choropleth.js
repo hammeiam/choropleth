@@ -4,57 +4,56 @@
 	 //    return new Choropleth();
 		// }
 	var Choropleth = function(config){
+		this.mapSelector = config.mapSelector;
+		this.dataStore = config.dataStore;
 		this.currentSelection = { zoom: 'world' };
 		this.firstRender = true;
 		this.projection = d3.geo.mercator().scale(150);
 		this.path = function(){
 			return d3.geo.path().projection(this.projection)
 		}.bind(this);
+
+		this.onClick = function(featureData){
+			var newSelection = this.currentSelection;
+			if(featureData){
+				switch(this.currentSelection.zoom){
+					case 'world':
+						newSelection.zoom = 'country';
+						newSelection.country = featureData.id;
+						this.currentFeature = {
+							id: featureData.id,
+							name: featureData.name,
+							bounds: this.path().bounds(featureData)
+						};
+						break;
+					case 'country':
+						newSelection.zoom = 'state';
+						newSelection.state = featureData.id;
+						this.currentFeature = {
+							id: featureData.id,
+							name: featureData.name,
+							bounds: this.path().bounds(featureData)
+						};
+						break;
+					default:
+						newSelection = { zoom:'world' };
+						break;
+				};			
+			} else {
+				// if there's no featureData, something like a body of water was clicked
+				newSelection = { zoom:'world' };
+			}
+
+			config.onClick.call(this, newSelection);
+		}.bind(this);
+		// consider just making this required 
+		if(typeof(window[config.dataStore]) === 'undefined')
+			window[config.dataStore] = {};
+		this.onClick();
 		return this;
 	};
 
 	Choropleth.prototype = {
-		init: function(config){
-			this.mapSelector = config.mapSelector;
-			this.dataStore = config.dataStore;
-			this.onClick = function(featureData){
-				var newSelection = this.currentSelection;
-				if(featureData){
-					switch(this.currentSelection.zoom){
-						case 'world':
-							newSelection.zoom = 'country';
-							newSelection.country = featureData.id;
-							this.currentFeature = {
-								id: featureData.id,
-								name: featureData.name,
-								bounds: this.path().bounds(featureData)
-							};
-							break;
-						case 'country':
-							newSelection.zoom = 'state';
-							newSelection.state = featureData.id;
-							this.currentFeature = {
-								id: featureData.id,
-								name: featureData.name,
-								bounds: this.path().bounds(featureData)
-							};
-							break;
-						default:
-							newSelection = { zoom:'world' };
-							break;
-					};			
-				} else {
-					// if there's no featureData, something like a body of water was clicked
-					newSelection = { zoom:'world' };
-				}
-
-				config.onClick.call(null, newSelection);
-			}.bind(this);
-			// consider just making this required 
-			if(typeof(window[config.dataStore]) === 'undefined')
-				window[config.dataStore] = {};
-			this.onClick();
-		},
 		render: function(selection){
 			var self = this;
 			self.currentSelection = selection;
