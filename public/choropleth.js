@@ -3,47 +3,40 @@
 		// if (window === this) {
 	 //    return new Choropleth();
 		// }
+
+	//// global private vars ////
+	var zoom, country, state, data, max, landFill, cityFill, self;
+	var filePath, id, features, className,
+		beforeRender = function(){},
+		afterRender = function(){};
+	var m_width,
+		width = 938,
+		height = 500;
+
 	var Choropleth = function(config){
+		self = this;
 		this.mapSelector = config.mapSelector;
+		m_width = $(config.mapSelector).width(),
 		this.dataStore = config.dataStore;
 		this.currentSelection = { zoom: 'world' };
 		this.firstRender = true;
-		this.projection = d3.geo.mercator().scale(150);
+		this.projection = d3.geo.mercator().scale(150).translate([width / 2, height / 1.5]);
 		this.path = function(){
-			return d3.geo.path().projection(this.projection)
-		}.bind(this);
+			return d3.geo.path().projection(self.projection)
+		}
 
 		this.onClick = function(featureData){
 			var newSelection = this.currentSelection;
-			if(featureData){
-				switch(this.currentSelection.zoom){
-					case 'world':
-						newSelection.zoom = 'country';
-						newSelection.country = featureData.id;
-						this.currentFeature = {
-							id: featureData.id,
-							name: featureData.name,
-							bounds: this.path().bounds(featureData)
-						};
-						break;
-					case 'country':
-						newSelection.zoom = 'state';
-						newSelection.state = featureData.id;
-						this.currentFeature = {
-							id: featureData.id,
-							name: featureData.name,
-							bounds: this.path().bounds(featureData)
-						};
-						break;
-					default:
-						newSelection = { zoom:'world' };
-						break;
-				};			
+			var zoom = newSelection.zoom;
+			// if we clicked a valid feature AND we can zoom closer
+			if(featureData && (zoom === 'world' || zoom === 'country')){
+					var smallerUnit = zoom === 'world' ? 'country' : 'state';
+					newSelection.zoom = smallerUnit
+					newSelection[smallerUnit] = featureData.id;
+					this.currentFeature = featureData;
 			} else {
-				// if there's no featureData, something like a body of water was clicked
 				newSelection = { zoom:'world' };
 			}
-
 			config.onClick.call(this, newSelection);
 		}.bind(this);
 		// consider just making this required 
@@ -58,24 +51,15 @@
 			var self = this;
 			self.currentSelection = selection;
 			// SETUP
-			var zoom = selection['zoom'],
+			zoom = selection['zoom'],
 			country = selection['country'],
 			state = selection['state'],
-			data = this.get(selection);
-			var m_width = $(self.mapSelector).width(),
-			width = 938,
-			height = 500;
-			var max = d3.max(d3.values(data), function(i){
-				return i.value;
-			});
-			var fill = d3.scale.quantize()
-			.domain([0, max])
-			.range(d3.range(5).map(function(i) { return "color-scale-" + i; }));
-			var getValue = function(key){
-				if(data[key] && data[key]['value'])
-					return data[key]['value'];
-				return 0;
-			};
+			data = self.get(selection),
+			max = d3.max(d3.values(data), function(i){ return i.value; }),
+			landFill = d3.scale.quantize().domain([0, max])
+				.range(d3.range(5).map(function(i) { return "color-scale-" + i; }));
+			cityFill = d3.scale.quantize().domain([0, max])
+				.range(d3.range(1,5,0.5));
 
 			if(self.firstRender){
 				var svg = d3.select(self.mapSelector).append("svg")
@@ -96,97 +80,15 @@
 					svg.attr("height", w * height / width);
 				});
 			};
-			
-			var filePath, id, features, className,
-			beforeRender = function(){},
-			afterRender = function(){};
 
-			switch(zoom){
-				case 'world':
-					beforeRender = function(){
-						self.projection = d3.geo.mercator().scale(150).translate([width / 2, height / 1.5]);
-						// self.path = d3.geo.path().projection(self.projection);
-					};
-					afterRender = function(){
-						var xyz = [width / 2, height / 1.5, 1];
-						self.g.attr("transform", "translate(" + self.projection.translate() + ")scale(" + xyz[2] + ")translate(-" + xyz[0] + ",-" + xyz[1] + ")")
-					}
-					filePath = "geodata/countries.topo.json";
-					id = "countries";
-					features = function(topoData){return topojson.feature(topoData, topoData.objects.countries).features};
-					className = "country "
-					break;
-				case 'country':
-					if(country === 'USA'){
-						beforeRender = function(){
-							self.projection = d3.geo.albersUsa()
-							.scale(1000).translate([width / 2, height / 2]);
-						}
-					} else if(country === 'RUS'){
-						// make sure that the country isn't split on 2 sides of the map somehow
-						beforeRender = function(){
-							var xyz = getXYZ(self.currentFeature.bounds, width, height);
-							self.projection = d3.geo.albers()
-								.rotate([-105, 0])
-							  .center([-10, 59])
-							  .parallels([52, 64])
-							  .scale(700)
-							  .translate([width / 2, height / 2]);
-						}
-						afterRender = function(){
-							var xyz = getXYZ(self.currentFeature.bounds, width, height);
-							self.g.attr("transform", "translate(" + self.projection.translate() + ")scale(" + xyz[2] + ")translate(-" + xyz[0] + ",-" + xyz[1] + ")")
-							.selectAll(["#countries", "#states", "#cities"])
-							.style("stroke-width", 1.0 / xyz[2] + "px")
-						}
-					}else {
-						afterRender = function(){
-							var xyz = getXYZ(self.currentFeature.bounds, width, height);
-							self.g.attr("transform", "translate(" + self.projection.translate() + ")scale(" + xyz[2] + ")translate(-" + xyz[0] + ",-" + xyz[1] + ")")
-							.selectAll(["#countries", "#states", "#cities"])
-							.style("stroke-width", 1.0 / xyz[2] + "px")
-						}
-					};
-					filePath = "geodata/" + country + "/states.topo.json";
-					id = "states";
-					features = function(topoData){return topojson.feature(topoData, topoData.objects.states).features};
-					className = "state "
-					break;
-				case 'state':
-					afterRender = function(){
-						var xyz = getXYZ(self.currentFeature.bounds, width, height);
-						self.g.attr("transform", "translate(" + self.projection.translate() + ")scale(" + xyz[2] + ")translate(-" + xyz[0] + ",-" + xyz[1] + ")")
-						.selectAll(["#countries", "#states", "#cities"])
-						.style("stroke-width", 1.0 / xyz[2] + "px")
-						.selectAll(".city")
-						.attr("d", self.path().pointRadius(10.0 / xyz[2]));
-					}
-					filePath = "geodata/" + country + "/" + state + "_cities.topo.json";
-					id = "cities";
-					features = function(topoData){return topojson.feature(topoData, topoData.objects.cities).features};
-					className = "city "
-					break;
-				};
-
-				d3.json(filePath, function(error, topoData) {
-					if (error) return console.error(error);
-					beforeRender();
-
-					self.g.select("g").remove();
-					self.g.append("g")
-					.attr("id", id)
-					.selectAll("path")
-					.data(features(topoData))
-					.enter()
-					.append("path")
-					.attr("id", function(d) { return d.id || d.properties.name; })
-					.attr("class", function(d) { return className + (d.id ? fill(getValue(d.id)) : '');  })
-					.attr("d", self.path())
-					.on("click", self.onClick);
-
-					afterRender();
-				});
-				self.firstRender = false;
+			if(zoom === 'world'){
+				renderWorld();
+			} else if(zoom === 'country'){
+				renderCountry();
+			} else if(zoom === 'state'){
+				renderState();
+			}
+			self.firstRender = false;			
 			},
 
 			insert: function(newData, selection){
@@ -219,7 +121,7 @@
 					}
 					destination['children'] = {};
 					Object.keys(newData).forEach(function(key){
-						destination['children'][key] = { "value": newData[key] };
+						destination['children'][key] = newData[key];
 					});
 
 					return destination['children'];
@@ -258,6 +160,196 @@
 			}
 		};
 
+	//// RENDER FUNCTIONS ////
+	function renderWorld(){
+		beforeRender = function(){
+			self.projection = d3.geo.mercator().scale(150).translate([width / 2, height / 1.5]);;
+		};
+		afterRender = function(){
+			var xyz = [width / 2, height / 1.5, 1];
+			self.g.attr("transform", 
+				"translate(" + self.projection.translate() + ")scale(" + xyz[2] + ")translate(-" + xyz[0] + ",-" + xyz[1] + ")")
+		}
+		filePath = "geodata/countries.topo.json";
+		id = "countries";
+		features = function(topoData){return topojson.feature(topoData, topoData.objects.countries).features};
+		className = "country ";
+
+		d3.json(filePath, function(error, topoData) {
+			if (error) return console.error(error);
+			beforeRender();
+
+			self.g.selectAll("g").remove();
+			self.g.append("g")
+			.attr("id", id)
+			.selectAll("path")
+			.data(features(topoData))
+			.enter()
+			.append("path")
+			.attr("id", function(d) { return d.id || d.properties.name; })
+			.attr("class", function(d) { return className + (d.id ? landFill(getValue(data, d.id)) : '');  })
+			.attr("d", self.path())
+			.on("click", self.onClick);
+
+			afterRender();
+		});
+	}
+
+	function renderCountry(){
+		if(country === 'USA'){
+			beforeRender = function(){
+				self.projection = d3.geo.albersUsa()
+				.scale(1000).translate([width / 2, height / 1.7]);
+			}
+		} else if(country === 'RUS'){
+			beforeRender = function(){
+				self.projection = d3.geo.albers()
+					.rotate([-105, 0])
+				  .center([-10, 59])
+				  .parallels([52, 64])
+				  .scale(700)
+				  .translate([width / 2, height / 2]);
+			}
+			afterRender = function(){
+				var bounds = self.path().bounds(self.currentFeature)
+				var xyz = getXYZ(bounds, width, height);
+				self.g.attr("transform", "translate(" + self.projection.translate() + ")scale(" + xyz[2] + ")translate(-" + xyz[0] + ",-" + xyz[1] + ")")
+				.selectAll(["#countries", "#states", "#cities"])
+				.style("stroke-width", 1.0 / xyz[2] + "px")
+			}
+		}else {
+			afterRender = function(){
+				var bounds = self.path().bounds(self.currentFeature)
+				var xyz = getXYZ(bounds, width, height);
+				self.g.attr("transform", "translate(" + self.projection.translate() + ")scale(" + xyz[2] + ")translate(-" + xyz[0] + ",-" + xyz[1] + ")")
+				.selectAll(["#countries", "#states", "#cities"])
+				.style("stroke-width", 1.0 / xyz[2] + "px")
+			}
+		};
+		filePath = "geodata/" + country + "/states.topo.json";
+		id = "states";
+		features = function(topoData){return topojson.feature(topoData, topoData.objects.states).features};
+		className = "state "
+		d3.json(filePath, function(error, topoData) {
+			if (error) return console.error(error);
+			beforeRender();
+
+			self.g.selectAll("g").remove();
+			self.g.append("g")
+			.attr("id", id)
+			.selectAll("path")
+			.data(features(topoData))
+			.enter()
+			.append("path")
+			.attr("id", function(d) { return d.id || d.properties.name; })
+			.attr("class", function(d) { return className + (d.id ? landFill(getValue(data, d.id)) : '');  })
+			.attr("d", self.path())
+			.on("click", self.onClick);
+
+			afterRender();
+		});
+	}
+
+	function renderState(){
+		//NOTES:
+		// - make sure that bigger cities are stacked behind smaller ones
+		// outlines or different colors will be req'd to differentiate
+		// - pull out stroke vals into set-able vars
+		// - rotate for alaska so it's not split
+		// - I don't understand how scaling only affects the circles (inversely)
+		// but not the rest of the map. wtf. 
+
+		// remove old projection
+		self.g.select("#states").remove()
+		// change/ update projection
+		self.projection = d3.geo.mercator().scale(1000).translate([width / 2, height / 1.5]);
+		var bounds = self.path().bounds(self.currentFeature)
+		var xyz = getXYZ(bounds, width, height);
+		// add our selected state back
+		self.g.append("g")
+			.attr("id", id)
+			.selectAll("path")
+			.data([self.currentFeature])
+			.enter()
+			.append("path")
+			.attr("id", function(d) { return d.id || d.properties.name; })
+			.attr("class", 'state active-land')
+			.attr("d", self.path())
+			.on("click", self.onClick);
+
+		self.g.append("g")
+			.attr("id", "cities")
+			.selectAll(".city")
+			.data(Object.keys(data))
+		.enter()
+			.append("circle")
+			.attr("r", function(d){ return cityFill(data[d].value) })
+			.style("fill", "#FF9933" )
+			.style("stroke", "white")
+			.style("stroke-width", ".2px")
+			.attr("id", function(d){ return d })
+			.attr("class", "city")
+			.attr("transform", function(d) {
+				var obj = data[d]
+			  return "translate(" + self.projection([ obj.long, obj.lat ]) + ")";
+			})
+			.on("click", self.onClick)
+			.call(tooltip(
+        function(d, i){
+          return "<b>"+ d + "</b><br/>count: "+data[d].value;
+        }
+        ));
+
+		
+		self.g.attr("transform", "translate(" + self.projection.translate() + ")scale(" + xyz[2] + ")translate(" + -1*xyz[0] + "," + -1*xyz[1] + ")")
+			.selectAll("#states")
+			.style("stroke-width", 2 / xyz[2] + "px")
+	}
+
+	//// HELPER FUNCTIONS ////
+
+	function tooltip(accessor){
+		// from http://bl.ocks.org/rveciana/5181105
+    return function(selection){
+      var tooltipDiv;
+      var bodyNode = d3.select('body').node();
+      selection.on("mouseover", function(d, i){
+        // Clean up lost tooltips
+        d3.select('body').selectAll('div.tooltip').remove();
+        // Append tooltip
+        tooltipDiv = d3.select('body').append('div').attr('class', 'tooltip');
+        var absoluteMousePos = d3.mouse(bodyNode);
+        tooltipDiv.style('left', (absoluteMousePos[0] + 20)+'px')
+          .style('top', (absoluteMousePos[1] - 25)+'px')
+          .style('position', 'absolute') 
+          .style('z-index', 1001);
+        // Add text using the accessor function
+        var tooltipText = accessor(d, i) || '';
+        // Crop text arbitrarily
+        //tooltipDiv.style('width', function(d, i){return (tooltipText.length > 80) ? '300px' : null;})
+        //    .html(tooltipText);
+      })
+      .on('mousemove', function(d, i) {
+        // Move tooltip
+        var absoluteMousePos = d3.mouse(bodyNode);
+        tooltipDiv.style('left', (absoluteMousePos[0] + 10)+'px')
+          .style('top', (absoluteMousePos[1] - 15)+'px');
+        var tooltipText = accessor(d, i) || '';
+        tooltipDiv.html(tooltipText);
+      })
+      .on("mouseout", function(d, i){
+        // Remove tooltip
+        tooltipDiv.remove();
+      });
+	  };
+	};
+	function getValue(data, key){
+		if(data[key] && data[key]['value'])
+			return data[key]['value'];
+		return 0;
+	}
+
+	// calculates scale for zooming into features
 	function getXYZ(bounds, width, height){
 		var w_scale = (bounds[1][0] - bounds[0][0]) / width;
 		var h_scale = (bounds[1][1] - bounds[0][1]) / height;
@@ -267,31 +359,33 @@
 		return [x, y, z];
 	};
 
+	// determines equality of two objects
 	function objectsAreEqual(firstObj, secondObj){
-		var firstObjKeys = Object.keys(firstObj);
-		var secondObjKeys = Object.keys(secondObj);
-		var result = true;
+		var firstObjKeys = Object.keys(firstObj),
+			secondObjKeys  = Object.keys(secondObj),
+			result = true;
 		if(firstObjKeys.length !== secondObjKeys.length){ return false }
 		for(var i = 0; i < firstObjKeys.length; i++){
-			var key = firstObjKeys[i];
-			var firstObjVal = firstObj[key],
-			secondObjVal = secondObj[key];
-			var firstObjValType = typeString(firstObjVal),
-			secondObjValType = typeString(secondObjVal);
+			var key = firstObjKeys[i],
+				firstObjVal  = firstObj[key],
+				secondObjVal = secondObj[key],
+				firstObjValType  = getType(firstObjVal),
+				secondObjValType = getType(secondObjVal);
 			if(firstObjValType !== secondObjValType){ result = false; }
-			if(['string', 'number', 'boolean'].indexOf(firstObjValType) != -1){
+			if(['string', 'number', 'boolean'].indexOf(firstObjValType) !== -1){
 				result = firstObjVal === secondObjVal;
-			} else if(['object', 'array'].indexOf(firstObjValType) != -1){
+			} else if(['object', 'array'].indexOf(firstObjValType) !== -1){
 				result = objectsAreEqual(firstObjVal, secondObjVal);
 			} else {
 				result = false;
 			}
 			if(result === false){ break; }
 		};
-		return result;
+		return result; //Boolean
 	};
 
-	function typeString(o) {
+	// returns an object's type
+	function getType(o) {
 		if (typeof o != 'object')
 			return typeof o;
 		if (o === null)
@@ -299,7 +393,7 @@
 	  //object, array, function, date, regexp, string, number, boolean, error
 	  var internalClass = Object.prototype.toString.call(o)
 	  .match(/\[object\s(\w+)\]/)[1];
-	  return internalClass.toLowerCase();
+	  return internalClass.toLowerCase(); //String
 	};
 
 	if(typeof(d3) === 'undefined'){
@@ -341,29 +435,3 @@
 // 		}
 // 	}
 // }
-
-// var dataObj = {};
-
-// var choropleth = new Choropleth({
-// 	mapSelector: '#map',
-// 	dataStore: dataObj, 
-// 	onClick: function(selection){
-// 		// {zoom: 'state', country: 'USA', state: 'CA'}
-// 		if(Choropleth.get(selection)){
-// 			Choropleth.render(selection);
-// 		} else {
-// 			$.ajax.get({
-// 				data: selection,
-// 				success: function(data){
-// 					// data = {'San Francisco': 4, 'Los Angeles': 10, 'San Diego': 3}
-// 					Choropleth.insert(data, selection);
-// 					Choropleth.render(selection);
-// 					otherThing.render();
-// 				}
-// 			});
-// 		};
-// 	}
-// })
-// localstorage: true
-// legend: '' 
-// hoverTemplate: ''
