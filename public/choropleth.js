@@ -241,7 +241,7 @@
 			beforeRender = function(){
 				self.projection = d3.geo.albers()
 					.rotate([-105, 0])
-				  .center([-10, 59])
+				  .center([-10, 65])
 				  .parallels([52, 64])
 				  .scale(700)
 				  .translate([width / 2, height / 2]);
@@ -297,7 +297,7 @@
 		d3.select("#loader")
 			.style("display", "none")
 		//NOTES:
-		// - make sure that bigger cities are stacked behind smaller ones
+		// - (done) make sure that bigger cities are stacked behind smaller ones
 		// outlines or different colors will be req'd to differentiate
 		// - pull out stroke vals into set-able vars
 		// - rotate for alaska so it's not split
@@ -310,6 +310,11 @@
 		self.projection = d3.geo.mercator().scale(1000).translate([width / 2, height / 1.5]);
 		var bounds = self.path().bounds(self.currentFeature)
 		var xyz = getXYZ(bounds, width, height);
+		// sort so largest circles are beneath smaller ones
+		var sortedData = Object.keys(data).sort(function(a,b){
+			return data[b]['value'] - data[a]['value'];
+		})
+
 		// add our selected state back
 		self.g.append("g")
 			.attr("id", id)
@@ -325,7 +330,7 @@
 		self.g.insert("g", "#loader")
 			.attr("id", "cities")
 			.selectAll(".city")
-			.data(Object.keys(data))
+			.data(sortedData)
 		.enter()
 			.append("circle")
 			.attr("r", function(d){ return cityFill(data[d].value) })
