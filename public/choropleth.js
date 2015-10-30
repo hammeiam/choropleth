@@ -26,6 +26,8 @@
 		}
 
 		this.onClick = function(featureData){
+			d3.select("#loader")
+			.style("display", "block")
 			var newSelection = this.currentSelection;
 			var zoom = newSelection.zoom;
 			// if we clicked a valid feature AND we can zoom closer
@@ -67,12 +69,32 @@
 				.attr("viewBox", "0 0 " + width + " " + height)
 				.attr("width", m_width)
 				.attr("height", m_width * height / width);
+
 				svg.append("rect")
 				.attr("class", "background")
 				.attr("width", width)
 				.attr("height", height)
 				.on("click", self.onClick);
-				self.g = svg.append("g");
+
+				self.g = svg.append("g")
+				.attr("id", "map-content");
+
+				self.loader = svg.append("g")
+					.attr("id", "loader")
+					.style("display", "none");
+
+				self.loader.append("rect")
+				.attr("width", width)
+				.attr("height", height)
+				.attr("fill", "red")
+				
+				self.loader.append("text")
+        .attr("x", width/2)
+        .attr("y", height/2)
+        .text("loading")
+        .attr("font-family", "sans-serif")
+        .attr("font-size", "20px")
+        .attr("fill", "blue");	
 
 				$(window).resize(function() {
 					var w = $("#map").width();
@@ -162,6 +184,9 @@
 
 	//// RENDER FUNCTIONS ////
 	function renderWorld(){
+		//// NOTES:
+		// hide tooltip for empty values (all renders)
+
 		beforeRender = function(){
 			self.projection = d3.geo.mercator().scale(150).translate([width / 2, height / 1.5]);;
 		};
@@ -177,6 +202,8 @@
 
 		d3.json(filePath, function(error, topoData) {
 			if (error) return console.error(error);
+			d3.select("#loader")
+			.style("display", "none")
 			beforeRender();
 
 			self.g.selectAll("g").remove();
@@ -189,7 +216,16 @@
 			.attr("id", function(d) { return d.id || d.properties.name; })
 			.attr("class", function(d) { return className + (d.id ? landFill(getValue(data, d.id)) : '');  })
 			.attr("d", self.path())
-			.on("click", self.onClick);
+			.on("click", self.onClick)
+			.call(tooltip(
+        function(d, i){
+        	var value = getValue(data,d.id);
+        	if(value > 0)
+          	return "<b>"+ d.properties.name + "</b><br/>count: "+getValue(data,d.id);
+          else
+          	return null
+        }
+       ));
 
 			afterRender();
 		});
@@ -232,6 +268,8 @@
 		className = "state "
 		d3.json(filePath, function(error, topoData) {
 			if (error) return console.error(error);
+			d3.select("#loader")
+			.style("display", "none")
 			beforeRender();
 
 			self.g.selectAll("g").remove();
@@ -244,13 +282,20 @@
 			.attr("id", function(d) { return d.id || d.properties.name; })
 			.attr("class", function(d) { return className + (d.id ? landFill(getValue(data, d.id)) : '');  })
 			.attr("d", self.path())
-			.on("click", self.onClick);
+			.on("click", self.onClick)
+			.call(tooltip(
+        function(d, i){
+          return "<b>"+ d.properties.name + "</b><br/>count: "+getValue(data,d.id);
+        }
+      ));
 
 			afterRender();
 		});
 	}
 
 	function renderState(){
+		d3.select("#loader")
+			.style("display", "none")
 		//NOTES:
 		// - make sure that bigger cities are stacked behind smaller ones
 		// outlines or different colors will be req'd to differentiate
@@ -277,7 +322,7 @@
 			.attr("d", self.path())
 			.on("click", self.onClick);
 
-		self.g.append("g")
+		self.g.insert("g", "#loader")
 			.attr("id", "cities")
 			.selectAll(".city")
 			.data(Object.keys(data))
@@ -322,7 +367,7 @@
         tooltipDiv.style('left', (absoluteMousePos[0] + 20)+'px')
           .style('top', (absoluteMousePos[1] - 25)+'px')
           .style('position', 'absolute') 
-          .style('z-index', 1001);
+          .style('z-index', 2);
         // Add text using the accessor function
         var tooltipText = accessor(d, i) || '';
         // Crop text arbitrarily
