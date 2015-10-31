@@ -15,6 +15,7 @@
 
 	var Choropleth = function(config){
 		self = this;
+		this.valueName = config.valueName || 'value';
 		this.mapSelector = config.mapSelector;
 		this.el = window.document.getElementById(self.mapSelector.slice(1));
 		m_width = $(self.mapSelector).width(),
@@ -66,7 +67,7 @@
 			country = selection['country'],
 			state = selection['state'],
 			data = self.get(selection),
-			max = d3.max(d3.values(data), function(i){ return i.value; }),
+			max = d3.max(d3.values(data), function(i){ return i[self.valueName]; }),
 			landFill = d3.scale.quantize().domain([0, max])
 				.range(d3.range(5).map(function(i) { return "color-scale-" + i; }));
 			cityFill = d3.scale.quantize().domain([0, max])
@@ -210,11 +211,7 @@
 			.on("click", self.onClick)
 			.call(tooltip(
         function(d, i){
-        	var value = getValue(data,d.id);
-        	if(value > 0)
-          	return "<b>"+ d.properties.name + "</b><br/>count: "+getValue(data,d.id);
-          else
-          	return null
+        	return "<b>"+ d.properties.name + "</b><br/>" + self.valueName + ": "+getValue(data,d.id);	
         }
        ));
 
@@ -275,9 +272,9 @@
 			.on("click", self.onClick)
 			.call(tooltip(
         function(d, i){
-          return "<b>"+ d.properties.name + "</b><br/>count: "+getValue(data,d.id);
+        	return "<b>"+ d.properties.name + "</b><br/>" + self.valueName + ": "+getValue(data,d.id);	
         }
-      ));
+       ));
 
 			afterRender();
 		});
@@ -300,8 +297,11 @@
 		var bounds = self.path().bounds(self.currentFeature)
 		var xyz = getXYZ(bounds, width, height);
 		// sort so largest circles are beneath smaller ones
-		var sortedData = Object.keys(data).sort(function(a,b){
-			return data[b]['value'] - data[a]['value'];
+		var sortedData = Object.keys(data).map(function(key){
+			data[key].id = key
+			return data[key];
+		}).sort(function(a,b){
+			return getValue(data,b) - getValue(data,a);
 		})
 
 		// add our selected state back
@@ -322,22 +322,21 @@
 			.data(sortedData)
 		.enter()
 			.append("circle")
-			.attr("r", function(d){ return cityFill(data[d].value) })
+			.attr("r", function(d){ return cityFill(getValue(data,d.id)) })
 			.style("fill", "#FF9933" )
 			.style("stroke", "white")
 			.style("stroke-width", ".2px")
-			.attr("id", function(d){ return d })
+			.attr("id", function(d){ return d.id })
 			.attr("class", "city")
 			.attr("transform", function(d) {
-				var obj = data[d]
-			  return "translate(" + self.projection([ obj.long, obj.lat ]) + ")";
+			  return "translate(" + self.projection([ d.long, d.lat ]) + ")";
 			})
 			.on("click", self.onClick)
 			.call(tooltip(
         function(d, i){
-          return "<b>"+ d + "</b><br/>count: "+data[d].value;
+          return "<b>"+ d.id + "</b><br/>" + self.valueName + ": " + getValue(data,d.id);
         }
-        ));
+      ));
 
 		
 		self.g.attr("transform", "translate(" + self.projection.translate() + ")scale(" + xyz[2] + ")translate(" + -1*xyz[0] + "," + -1*xyz[1] + ")")
@@ -360,6 +359,7 @@
       var tooltipDiv;
       var bodyNode = d3.select('body').node();
       selection.on("mouseover", function(d, i){
+      	if(getValue(data,d.id) === 0){ return; }  		
         // Clean up lost tooltips
         d3.select('body').selectAll('div.tooltip').remove();
         // Append tooltip
@@ -376,6 +376,7 @@
         //    .html(tooltipText);
       })
       .on('mousemove', function(d, i) {
+      	if(getValue(data,d.id) === 0){ return; }  		
         // Move tooltip
         var absoluteMousePos = d3.mouse(bodyNode);
         tooltipDiv.style('left', (absoluteMousePos[0] + 10)+'px')
@@ -384,14 +385,16 @@
         tooltipDiv.html(tooltipText);
       })
       .on("mouseout", function(d, i){
+      	if(getValue(data,d.id) === 0){ return; }  		
         // Remove tooltip
         tooltipDiv.remove();
       });
 	  };
 	};
+
 	function getValue(data, key){
-		if(data[key] && data[key]['value'])
-			return data[key]['value'];
+		if(data[key] && data[key][self.valueName])
+			return data[key][self.valueName];
 		return 0;
 	}
 
