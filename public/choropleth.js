@@ -16,7 +16,8 @@
 	var Choropleth = function(config){
 		self = this;
 		this.mapSelector = config.mapSelector;
-		m_width = $(config.mapSelector).width(),
+		this.el = window.document.getElementById(self.mapSelector.slice(1));
+		m_width = $(self.mapSelector).width(),
 		this.dataStore = config.dataStore;
 		this.currentSelection = { zoom: 'world' };
 		this.firstRender = true;
@@ -24,10 +25,18 @@
 		this.path = function(){
 			return d3.geo.path().projection(self.projection)
 		}
+		this.loader = window.document.createElement("div");
+		this.loader.className = "loader";
+		this.loader.style.display = "none";
+		var loaderCenter = window.document.createElement("div");
+		loaderCenter.className = "loaderCenter";
+		if(config.loadingText)
+			loaderCenter.innerHTML = config.loadingText
+		this.loader.appendChild(loaderCenter);
+		this.el.appendChild(this.loader);
 
 		this.onClick = function(featureData){
-			d3.select("#loader")
-			.style("display", "block")
+			toggleLoader()
 			var newSelection = this.currentSelection;
 			var zoom = newSelection.zoom;
 			// if we clicked a valid feature AND we can zoom closer
@@ -64,7 +73,7 @@
 				.range(d3.range(1,5,0.5));
 
 			if(self.firstRender){
-				var svg = d3.select(self.mapSelector).append("svg")
+				var svg = d3.select(self.mapSelector).insert("svg", ":first-child")
 				.attr("preserveAspectRatio", "xMidYMid")
 				.attr("viewBox", "0 0 " + width + " " + height)
 				.attr("width", m_width)
@@ -78,23 +87,6 @@
 
 				self.g = svg.append("g")
 				.attr("id", "map-content");
-
-				self.loader = svg.append("g")
-					.attr("id", "loader")
-					.style("display", "none");
-
-				self.loader.append("rect")
-				.attr("width", width)
-				.attr("height", height)
-				.attr("fill", "red")
-				
-				self.loader.append("text")
-        .attr("x", width/2)
-        .attr("y", height/2)
-        .text("loading")
-        .attr("font-family", "sans-serif")
-        .attr("font-size", "20px")
-        .attr("fill", "blue");	
 
 				$(window).resize(function() {
 					var w = $("#map").width();
@@ -202,8 +194,7 @@
 
 		d3.json(filePath, function(error, topoData) {
 			if (error) return console.error(error);
-			d3.select("#loader")
-			.style("display", "none")
+			toggleLoader()
 			beforeRender();
 
 			self.g.selectAll("g").remove();
@@ -268,8 +259,7 @@
 		className = "state "
 		d3.json(filePath, function(error, topoData) {
 			if (error) return console.error(error);
-			d3.select("#loader")
-			.style("display", "none")
+			toggleLoader()
 			beforeRender();
 
 			self.g.selectAll("g").remove();
@@ -294,8 +284,7 @@
 	}
 
 	function renderState(){
-		d3.select("#loader")
-			.style("display", "none")
+		toggleLoader()
 		//NOTES:
 		// - (done) make sure that bigger cities are stacked behind smaller ones
 		// outlines or different colors will be req'd to differentiate
@@ -357,6 +346,13 @@
 	}
 
 	//// HELPER FUNCTIONS ////
+
+	function toggleLoader(){
+		if(self.loader.style.display === "none")
+			self.loader.style.display = "block"
+		else
+			self.loader.style.display = "none"
+	}
 
 	function tooltip(accessor){
 		// from http://bl.ocks.org/rveciana/5181105

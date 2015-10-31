@@ -7,9 +7,33 @@
 	<script src="https://code.jquery.com/jquery-2.1.4.js"></script>
 	<script src="choropleth.js"></script>
 	<style type="text/css">
+		html, body, * {
+			margin: 0;
+			padding: 0;
+			box-sizing: border-box;
+		}
 		#map {
 			background-color: #fff;
 			border: 1px solid #ccc;
+			position: relative;
+		}
+		.loader {
+			background-color: red;
+			position: absolute;
+		  top: 0;
+		  left: 0;
+		  height: 100%;
+		  width: 100%;
+		}
+		.loader .loaderCenter {
+			position: absolute;
+		  top: 50%;
+		  left: 50%;
+		  height: 100px;
+		  width:200px;
+		  background-color: blue;
+		  transform: translate(-50%, -50%);
+		  color: white;
 		}
 		#table {
 			width: 100%;
@@ -91,6 +115,7 @@
 		var choropleth = new Choropleth({
 			mapSelector: '#map',
 			dataStore: dataObj, 
+			loadingText: 'LOADING',
 			onClick: function(selection){
 				// {zoom: 'state', country: 'USA', state: 'CA'}
 				var self = this;
