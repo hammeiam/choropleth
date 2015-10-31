@@ -7,31 +7,33 @@
 	<script src="https://code.jquery.com/jquery-2.1.4.js"></script>
 	<script src="choropleth.js"></script>
 	<style type="text/css">
-		html, body, * {
-			margin: 0;
-			padding: 0;
+		*{
 			box-sizing: border-box;
 		}
+		html, body {
+			margin: 0;
+			padding: 0;
+			font-family: helvetica, arial, sans-serif;
+		}
+
 		#map {
 			background-color: #fff;
 			border: 1px solid #ccc;
 			position: relative;
 		}
 		.loader {
-			background-color: red;
+			background-color: #bae4b3;
 			position: absolute;
 		  top: 0;
 		  left: 0;
 		  height: 100%;
 		  width: 100%;
+		  opacity: .8;
 		}
 		.loader .loaderCenter {
 			position: absolute;
 		  top: 50%;
 		  left: 50%;
-		  height: 100px;
-		  width:200px;
-		  background-color: blue;
 		  transform: translate(-50%, -50%);
 		  color: white;
 		}
@@ -53,13 +55,14 @@
 			stroke-linejoin: round;
 			stroke-linecap: round;
 		}
-		.tooltip{ background-color:rgba(68,136,187,0.5);;
-          margin: 10px;
-          height: 50px;
-          width: 150px;
-          padding-left: 10px; 
-          padding-top: 10px;
-}
+		.tooltip{ 
+			background-color:whitesmoke;;
+      margin: 10px;
+      min-height: 50px;
+      width: 180px;
+      padding:5px;
+      border: 2px solid lightgrey;
+		}
 		.country{
 			fill: whitesmoke;
 		}
@@ -85,6 +88,48 @@
 		}
 		.color-scale-4 {
 			fill: #006d2c;
+		}
+		.coolSpinner {
+			/* from http://projects.lukehaas.me/css-loaders/ */
+		  margin: 60px auto;
+		  font-size: 10px;
+		  position: relative;
+		  text-indent: -9999em;
+		  border-top: 1.1em solid rgba(255, 255, 255, 0.2);
+		  border-right: 1.1em solid rgba(255, 255, 255, 0.2);
+		  border-bottom: 1.1em solid rgba(255, 255, 255, 0.2);
+		  border-left: 1.1em solid #ffffff;
+		  -webkit-transform: translateZ(0);
+		  -ms-transform: translateZ(0);
+		  transform: translateZ(0);
+		  -webkit-animation: load8 1.1s infinite linear;
+		  animation: load8 1.1s infinite linear;
+		}
+		.coolSpinner,
+		.coolSpinner:after {
+		  border-radius: 50%;
+		  width: 10em;
+		  height: 10em;
+		}
+		@-webkit-keyframes load8 {
+		  0% {
+		    -webkit-transform: rotate(0deg);
+		    transform: rotate(0deg);
+		  }
+		  100% {
+		    -webkit-transform: rotate(360deg);
+		    transform: rotate(360deg);
+		  }
+		}
+		@keyframes load8 {
+		  0% {
+		    -webkit-transform: rotate(0deg);
+		    transform: rotate(0deg);
+		  }
+		  100% {
+		    -webkit-transform: rotate(360deg);
+		    transform: rotate(360deg);
+		  }
 		}
 
 	</style>
@@ -115,7 +160,7 @@
 		var choropleth = new Choropleth({
 			mapSelector: '#map',
 			dataStore: dataObj, 
-			loadingText: 'LOADING',
+			loadingText: '<div class="coolSpinner"></div>',
 			onClick: function(selection){
 				// {zoom: 'state', country: 'USA', state: 'CA'}
 				var self = this;
