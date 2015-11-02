@@ -209,6 +209,7 @@
 			.attr("class", function(d) { return className + (d.id ? landFill(getValue(data, d.id)) : '');  })
 			.attr("d", self.path())
 			.on("click", self.onClick)
+			.on("mouseover", function(d,i){ this.parentNode.appendChild(this) })
 			.call(tooltip(
         function(d, i){
         	return "<b>"+ d.properties.name + "</b><br/>" + self.valueName + ": "+getValue(data,d.id);	
@@ -270,6 +271,7 @@
 			.attr("class", function(d) { return className + (d.id ? landFill(getValue(data, d.id)) : '');  })
 			.attr("d", self.path())
 			.on("click", self.onClick)
+			.on("mouseover", function(d,i){ this.parentNode.appendChild(this) })
 			.call(tooltip(
         function(d, i){
         	return "<b>"+ d.properties.name + "</b><br/>" + self.valueName + ": "+getValue(data,d.id);	
@@ -312,7 +314,7 @@
 			.enter()
 			.append("path")
 			.attr("id", function(d) { return d.id || d.properties.name; })
-			.attr("class", 'state active-land')
+			.attr("class", 'active-land')
 			.attr("d", self.path())
 			.on("click", self.onClick);
 
@@ -358,7 +360,7 @@
     return function(selection){
       var tooltipDiv;
       var bodyNode = d3.select('body').node();
-      selection.on("mouseover", function(d, i){
+      selection.on("mouseover.tooltip", function(d, i){
       	if(getValue(data,d.id) === 0){ return; }  		
         // Clean up lost tooltips
         d3.select('body').selectAll('div.tooltip').remove();
@@ -375,7 +377,7 @@
         //tooltipDiv.style('width', function(d, i){return (tooltipText.length > 80) ? '300px' : null;})
         //    .html(tooltipText);
       })
-      .on('mousemove', function(d, i) {
+      .on('mousemove.tooltip', function(d, i) {
       	if(getValue(data,d.id) === 0){ return; }  		
         // Move tooltip
         var absoluteMousePos = d3.mouse(bodyNode);
@@ -384,7 +386,7 @@
         var tooltipText = accessor(d, i) || '';
         tooltipDiv.html(tooltipText);
       })
-      .on("mouseout", function(d, i){
+      .on("mouseout.tooltip", function(d, i){
       	if(getValue(data,d.id) === 0){ return; }  		
         // Remove tooltip
         tooltipDiv.remove();

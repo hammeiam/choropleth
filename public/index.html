@@ -50,11 +50,13 @@
 			pointer-events: all;
 		}
 		#countries, #states {
-			fill: #cde;
-			stroke: #fff;
+			fill: #d4d8d4;
+			stroke: #bbb;
+			stroke-width: 1px;
 			stroke-linejoin: round;
 			stroke-linecap: round;
 		}
+		
 		.tooltip{ 
 			background-color:whitesmoke;;
       margin: 10px;
@@ -63,31 +65,39 @@
       padding:5px;
       border: 2px solid lightgrey;
 		}
-		.country{
-			fill: whitesmoke;
+		.country, .state{
+			stroke: #aaa;
+			stroke-width: 1;
+			stroke-linejoin: round;
+			stroke-linecap: round;
+		}
+
+		.country:hover, .state:hover {
+			stroke: #666;
+			/*stroke-width: 2;*/
 		}
 		.country-border{
 			fill: none;
 			stroke: darkslategray;
 		}
 		.active-land {
-			fill: #99CCCC;
+			fill: #c2e699;
 			stroke: darkslategray;
 		}
 		.color-scale-0 {
-			fill: #edf8e9;
+			fill: #d4d8d4;
 		}
 		.color-scale-1 {
-			fill: #bae4b3;
+			fill: #c2e699;
 		} 
 		.color-scale-2 {
-			fill: #74c476;
+			fill: #78c679;
 		}
 		.color-scale-3 {
 			fill: #31a354;
 		}
 		.color-scale-4 {
-			fill: #006d2c;
+			fill: #006837;
 		}
 		.coolSpinner {
 			/* from http://projects.lukehaas.me/css-loaders/ */
