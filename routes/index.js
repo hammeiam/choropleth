@@ -33,15 +33,6 @@ var pa  = {
   }
 }
 
-/* GET users listing. */
-router.get('/', function(req, res) {
-	console.log('rendering index')
-	res.render('index', { 
-		title: 'Map'
-	});
-  
-});
-
 router.get('/geodata', function(req, res) {
 	console.log(req.query)
 	var selection = req.query;
