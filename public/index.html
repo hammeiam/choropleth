@@ -16,12 +16,7 @@
 			font-family: helvetica, arial, sans-serif;
 		}
 
-		#map {
-			background-color: #fff;
-			border: 1px solid #ccc;
-			position: relative;
-		}
-		.loader {
+		.clp-loader {
 			background-color: #bae4b3;
 			position: absolute;
 		  top: 0;
@@ -30,12 +25,58 @@
 		  width: 100%;
 		  opacity: .8;
 		}
-		.loader .loaderCenter {
+		.clp-loader .clp-loaderCenter {
 			position: absolute;
 		  top: 50%;
 		  left: 50%;
 		  transform: translate(-50%, -50%);
 		  color: white;
+		}
+		.clp-background {
+			fill: white;
+			pointer-events: all;
+		}
+		.clp-land {
+			fill: #d4d8d4;
+			stroke: #aaa;
+		}
+		.clp-subunit:hover {
+			stroke: #555;
+		}
+		.clp-city {
+		  fill: rgb(255, 153, 51);
+		  stroke: white;
+		}
+		.clp-tooltip{ 
+			background-color:whitesmoke;;
+      margin: 10px;
+      min-height: 50px;
+      width: 180px;
+      padding:5px;
+      border: 2px solid lightgrey;
+		}
+		
+		.clp-color-scale-0 {
+			fill: #d4d8d4;
+		}
+		.clp-color-scale-1 {
+			fill: #ffffcc;
+		}
+		.clp-color-scale-2 {
+			fill: #c2e699;
+		} 
+		.clp-color-scale-3 {
+			fill: #78c679;
+		}
+		.clp-color-scale-4 {
+			fill: #31a354;
+		}
+		.clp-color-scale-5 {
+			fill: #006837;
+		}
+		/* their css */
+		#map {
+			position: relative;
 		}
 		#table {
 			width: 100%;
@@ -44,60 +85,6 @@
 			display: inline-block;
 			min-width: 100px;
 			border: 1px solid lightgrey;
-		}
-		.background {
-			fill: none;
-			pointer-events: all;
-		}
-		#countries, #states {
-			fill: #d4d8d4;
-			stroke: #bbb;
-			stroke-width: 1px;
-			stroke-linejoin: round;
-			stroke-linecap: round;
-		}
-		
-		.tooltip{ 
-			background-color:whitesmoke;;
-      margin: 10px;
-      min-height: 50px;
-      width: 180px;
-      padding:5px;
-      border: 2px solid lightgrey;
-		}
-		.country, .state{
-			stroke: #aaa;
-			stroke-width: 1;
-			stroke-linejoin: round;
-			stroke-linecap: round;
-		}
-
-		.country:hover, .state:hover {
-			stroke: #666;
-			/*stroke-width: 2;*/
-		}
-		.country-border{
-			fill: none;
-			stroke: darkslategray;
-		}
-		.active-land {
-			fill: #c2e699;
-			stroke: darkslategray;
-		}
-		.color-scale-0 {
-			fill: #d4d8d4;
-		}
-		.color-scale-1 {
-			fill: #c2e699;
-		} 
-		.color-scale-2 {
-			fill: #78c679;
-		}
-		.color-scale-3 {
-			fill: #31a354;
-		}
-		.color-scale-4 {
-			fill: #006837;
 		}
 		.coolSpinner {
 			/* from http://projects.lukehaas.me/css-loaders/ */
@@ -146,6 +133,7 @@
 </head>
 <body>
 	<div id="map"></div>
+	<div id="map2"></div>
 	<div id="table"></div>
 	<script type="text/javascript">
 	  // some function to manipulate other elements 
@@ -159,7 +147,7 @@
 				var domStr = '';
 				domStr += "<div class='row'>"
 				domStr += "<div class='cell key'>" + key + "</div>"
-				domStr += "<div class='cell value'>" + value['value'] + "</div>"
+				domStr += "<div class='cell value'>" + choropleth.getValue(data,key) + "</div>"
 				domStr += "</div>"
 				$table.append(domStr);
 			})
@@ -170,7 +158,7 @@
 		var choropleth = new Choropleth({
 			mapSelector: '#map',
 			dataStore: dataObj, 
-			loadingText: '<div class="coolSpinner"></div>',
+			loadingHTML: '<div class="coolSpinner"></div>',
 			onClick: function(selection){
 				// {zoom: 'state', country: 'USA', state: 'CA'}
 				var self = this;
@@ -185,6 +173,7 @@
 						dataType: 'json',
 						success: function(data){
 							// data = {'San Francisco': 4, 'Los Angeles': 10, 'San Diego': 3}
+							
 							self.insert(data, selection);
 							self.render(selection);
 							updateTable(self.get(selection));
@@ -193,6 +182,7 @@
 				};
 			}
 		})
+		
 	</script>
 </body>
 </html>

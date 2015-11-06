@@ -7,7 +7,7 @@ var pa  = {
     "long": -75.477791
   },
   "lancaster": {
-    "value": 16,
+    "value": 30,
     "lat": 40.0397,
     "long": -76.3044
   },
@@ -17,7 +17,7 @@ var pa  = {
     "long": -76.3033
   },
   "york": {
-    "value": 14,
+    "value": 1,
     "lat": 39.9628,
     "long": -76.7281
   },

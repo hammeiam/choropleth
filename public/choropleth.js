@@ -1,488 +1,494 @@
-(function(window, d3, topojson, $){
-	'use strict';
-		// if (window === this) {
-	 //    return new Choropleth();
-		// }
+(function(window, d3, topojson, $) {
+  //////// READ-ONLY VARS ////////
+  var defaultConfig = {
+    onClick: function() {
+      console.log("No onClick defined")
+    },
+    valueName: "value",
+    mapSelector: "#map",
+    dataStore: null, // consider something else for this
+    currentSelection: {
+      zoom: "world"
+    },
+    loadingHTML: "",
+    filePath: {
+      "world": "geodata/countries.topo.json",
+      "country": "geodata/[country]/states.topo.json"
+    }
+  };
+  var width = 938,
+    height = 500;
 
-	//// global private vars ////
-	var zoom, country, state, data, max, landFill, cityFill, self;
-	var filePath, id, features, className,
-		beforeRender = function(){},
-		afterRender = function(){};
-	var m_width,
-		width = 938,
-		height = 500;
+  //////// CONSTRUCTOR ////////
+  var Choropleth = function(userConfig) {
+    var config = {};
+    Object.keys(defaultConfig).forEach(function(k) {
+      config[k] = userConfig[k] || defaultConfig[k];
+    })
+    this.firstRender = true;
+    this.valueName = config.valueName;
+    this.dataStore = config.dataStore;
+    this.mapSelector = config.mapSelector;
+    this.externalOnClick = config.onClick;
+    this.currentSelection = config.currentSelection;
+    this.el = window.document.getElementById(this.mapSelector.slice(1));
+    this.loader = createLoader(config.loadingHTML, this.el); // may need to bind
+    this.filePath = config.filePath;
 
-	var Choropleth = function(config){
-		self = this;
-		this.valueName = config.valueName || 'value';
-		this.mapSelector = config.mapSelector;
-		this.el = window.document.getElementById(self.mapSelector.slice(1));
-		m_width = $(self.mapSelector).width(),
-		this.dataStore = config.dataStore;
-		this.currentSelection = { zoom: 'world' };
-		this.firstRender = true;
-		this.projection = d3.geo.mercator().scale(150).translate([width / 2, height / 1.5]);
-		this.path = function(){
-			return d3.geo.path().projection(self.projection)
-		}
-		this.loader = window.document.createElement("div");
-		this.loader.className = "loader";
-		this.loader.style.display = "none";
-		var loaderCenter = window.document.createElement("div");
-		loaderCenter.className = "loaderCenter";
-		if(config.loadingText)
-			loaderCenter.innerHTML = config.loadingText
-		this.loader.appendChild(loaderCenter);
-		this.el.appendChild(this.loader);
+    var that = this;
+    // we invoke externalOnClick at construction to fetch and render 
+    (function() {
+      that.onClick();
+    })()
+  }
 
-		this.onClick = function(featureData){
-			toggleLoader()
-			var newSelection = this.currentSelection;
-			var zoom = newSelection.zoom;
-			// if we clicked a valid feature AND we can zoom closer
-			if(featureData && (zoom === 'world' || zoom === 'country')){
-					var smallerUnit = zoom === 'world' ? 'country' : 'state';
-					newSelection.zoom = smallerUnit
-					newSelection[smallerUnit] = featureData.id;
-					this.currentFeature = featureData;
-			} else {
-				newSelection = { zoom:'world' };
-			}
-			config.onClick.call(this, newSelection);
-		}.bind(this);
-		// consider just making this required 
-		if(typeof(window[config.dataStore]) === 'undefined')
-			window[config.dataStore] = {};
-		this.onClick();
-		return this;
-	};
+  //////// PUBLIC FUNCTIONS ////////
+  Choropleth.prototype.render = function(selection) {
+    var that = this,
+      zoom = selection["zoom"];
+    that.currentSelection = selection;
 
-	Choropleth.prototype = {
-		render: function(selection){
-			var self = this;
-			self.currentSelection = selection;
-			// SETUP
-			zoom = selection['zoom'],
-			country = selection['country'],
-			state = selection['state'],
-			data = self.get(selection),
-			max = d3.max(d3.values(data), function(i){ return i[self.valueName]; }),
-			landFill = d3.scale.quantize().domain([0, max])
-				.range(d3.range(5).map(function(i) { return "color-scale-" + i; }));
-			cityFill = d3.scale.quantize().domain([0, max])
-				.range(d3.range(1,5,0.5));
+    if (that.firstRender) {
+      // double check that we can use global read vars here
+      var svg = d3.select(that.mapSelector).insert("svg", ":first-child")
+        .attr("class", "clp-svg")
+        .attr("preserveAspectRatio", "xMidYMid")
+        .attr("viewBox", "0 0 " + width + " " + height)
+        .attr("width", $(that.mapSelector).width())
+        .attr("height", $(that.mapSelector).width() * height / width);
 
-			if(self.firstRender){
-				var svg = d3.select(self.mapSelector).insert("svg", ":first-child")
-				.attr("preserveAspectRatio", "xMidYMid")
-				.attr("viewBox", "0 0 " + width + " " + height)
-				.attr("width", m_width)
-				.attr("height", m_width * height / width);
+      svg.append("rect")
+        .attr("class", "clp-background")
+        .attr("width", width)
+        .attr("height", height)
+        .on("click", that.onClick.bind(that));
 
-				svg.append("rect")
-				.attr("class", "background")
-				.attr("width", width)
-				.attr("height", height)
-				.on("click", self.onClick);
+      that.g = svg.append("g");
 
-				self.g = svg.append("g")
-				.attr("id", "map-content");
+      $(window).resize(function() {
+        var w = $(that.mapSelector).width();
+        svg.attr("width", w);
+        svg.attr("height", w * height / width);
+      });
+      that.firstRender = false;
+    };
 
-				$(window).resize(function() {
-					var w = $("#map").width();
-					svg.attr("width", w);
-					svg.attr("height", w * height / width);
-				});
-			};
+    d3.selectAll(".clp-tooltip").remove()
 
-			if(zoom === 'world'){
-				renderWorld();
-			} else if(zoom === 'country'){
-				renderCountry();
-			} else if(zoom === 'state'){
-				renderState();
-			}
-			self.firstRender = false;			
-			},
+    if (zoom === "world") {
+      renderWorld.call(that);
+    } else if (zoom === "country") {
+      renderCountry.call(that);
+    } else if (zoom === "state") {
+      renderState.call(that);
+    }
+  }
+  Choropleth.prototype.insert = function(newData, selection) {
+    var zoomLevels = ["world", "country", "state"],
+      zoomIndex = zoomLevels.indexOf(selection.zoom),
+      dataObj = this.dataStore;
+    selection.world = "world";
+    for (var i = 0; i <= zoomIndex; i++) {
+      var zoomLevel = zoomLevels[i],
+        zoomItem = selection[zoomLevel];
+      if (!dataObj) {
+        dataObj = {};
+      }
+      if (!dataObj[zoomItem]) {
+        dataObj[zoomItem] = {};
+      }
+      if (!dataObj[zoomItem]["children"]) {
+        dataObj[zoomItem]["children"] = {};
+      }
+      dataObj = dataObj[zoomItem]["children"];
+    }
+    Object.keys(newData).forEach(function(key) {
+      dataObj[key] = newData[key];
+    });
+    return dataObj;
+  };
 
-			insert: function(newData, selection){
-				// inserting {PA: 1, CA: 3, NY: 5} into data[world][usa]
-				var existingData = this.get(selection);
-				if(existingData){
-					return existingData;
-				} else {
-					var zoom = selection['zoom'],
-					country = selection['country'],
-					state = selection['state'],
-					dataStore = this['dataStore'],
-					destination;
-					switch(zoom){
-						case 'world':
-							if(!dataStore['world'])
-								dataStore['world'] = {};
-							destination = dataStore['world'];
-							break;
-						case 'country':
-							if(!dataStore['world']['children'][country])
-								dataStore['world']['children'][country] = {};
-							destination = dataStore['world']['children'][country];
-							break;
-						case 'state':
-							if(!dataStore['world']['children'][country]['children'][state])
-								dataStore['world']['children'][country]['children'][state] = {};
-							destination = dataStore['world']['children'][country]['children'][state];
-							break;
-					}
-					destination['children'] = {};
-					Object.keys(newData).forEach(function(key){
-						destination['children'][key] = newData[key];
-					});
+  Choropleth.prototype.get = function(selection) {
+    selection = selection || {
+      "zoom": "world"
+    };
+    // only returns children because in a choropleth, we only care about the sub-unit's values
+    var zoomLevels = ["world", "country", "state"],
+      zoomIndex = zoomLevels.indexOf(selection.zoom),
+      dataObj = this.dataStore;
+    selection.world = "world";
+    for (var i = 0; i <= zoomIndex; i++) {
+      var zoomLevel = zoomLevels[i],
+        zoomItem = selection[zoomLevel];
+      if (!dataObj || !dataObj[zoomItem] || !dataObj[zoomItem]["children"]) {
+        return null;
+      }
+      dataObj = dataObj[zoomItem]["children"];
+    }
+    return dataObj;
+  };
 
-					return destination['children'];
-				}
-			},
+  Choropleth.prototype.getValue = function(data, key) {
+    if (data[key] && data[key][this.valueName])
+      return data[key][this.valueName];
+    return 0;
+  };
 
-			get: function(selection){
-				var zoom = selection['zoom'],
-				country = selection['country'],
-				state = selection['state'],
-				data = this['dataStore'],
-				output;
-				// could these be improved by try/catch ?
-				switch(zoom){
-					case 'world':
-						if(data['world'] && data['world']['children'])
-							output = data['world']['children'];
-						break;
-					case 'country':
-						if(data['world'] && 
-							data['world']['children'][country] && 
-							data['world']['children'][country]['children']){
-							output = data['world']['children'][country]['children'];
-						}
-						break;
-				case 'state':
-					if(data['world'] && 
-						data['world']['children'][country] && 
-						data['world']['children'][country]['children'][state] &&
-						data['world']['children'][country]['children'][state]['children']){
-						output = data['world']['children'][country]['children'][state]['children'];
-					}
-					break;
-				}
-				return output || null;
-			}
-		};
+  Choropleth.prototype.onClick = function(featureData) {
+    this.toggleLoader();
+    var newSelection = this.currentSelection;
+    var zoom = newSelection.zoom;
+    // if we clicked a valid feature AND we can zoom closer
+    if (featureData && zoom !== "state") {
+      var smallerUnit = zoom === "world" ? "country" : "state";
+      newSelection[smallerUnit] = featureData.id;
+      newSelection.zoom = smallerUnit;
+      this.currentFeature = featureData; // may not ever be used
+    } else {
+      newSelection = {
+        zoom: "world"
+      };
+    }
+    this.externalOnClick.call(this, newSelection);
+  };
 
-	//// RENDER FUNCTIONS ////
-	function renderWorld(){
-		//// NOTES:
-		// hide tooltip for empty values (all renders)
+  Choropleth.prototype.toggleLoader = function() {
+    // consider doing this with css
+    var loaderDisplay = this.loader.style.display;
+    this.loader.style.display = loaderDisplay === "none" ? "block" : "none";
+  };
 
-		beforeRender = function(){
-			self.projection = d3.geo.mercator().scale(150).translate([width / 2, height / 1.5]);;
-		};
-		afterRender = function(){
-			var xyz = [width / 2, height / 1.5, 1];
-			self.g.attr("transform", 
-				"translate(" + self.projection.translate() + ")scale(" + xyz[2] + ")translate(-" + xyz[0] + ",-" + xyz[1] + ")")
-		}
-		filePath = "geodata/countries.topo.json";
-		id = "countries";
-		features = function(topoData){return topojson.feature(topoData, topoData.objects.countries).features};
-		className = "country ";
+  //////// PRIVATE FUNCTIONS ////////
+  function renderWorld() {
+    var that = this;
+    d3.json(getFilePath.call(that, that.currentSelection), function(error, topoData) {
+      if (error) return console.error(error);
 
-		d3.json(filePath, function(error, topoData) {
-			if (error) return console.error(error);
-			toggleLoader()
-			beforeRender();
+      var projection = d3.geo.mercator().scale(150).translate([width / 2, height / 1.5]),
+        features = topojson.feature(topoData, topoData.objects.countries).features,
+        path = d3.geo.path().projection(projection),
+        xyz = [width / 2, height / 1.5, 1],
+        data = that.get(that.currentSelection),
+        max = findMax.call(that, data);
 
-			self.g.selectAll("g").remove();
-			self.g.append("g")
-			.attr("id", id)
-			.selectAll("path")
-			.data(features(topoData))
-			.enter()
-			.append("path")
-			.attr("id", function(d) { return d.id || d.properties.name; })
-			.attr("class", function(d) { return className + (d.id ? landFill(getValue(data, d.id)) : '');  })
-			.attr("d", self.path())
-			.on("click", self.onClick)
-			.on("mouseover", function(d,i){ this.parentNode.appendChild(this) })
-			.call(tooltip(
-        function(d, i){
-        	return "<b>"+ d.properties.name + "</b><br/>" + self.valueName + ": "+getValue(data,d.id);	
-        }
-       ));
+      that.toggleLoader();
+      that.g.selectAll("g").remove();
 
-			afterRender();
-		});
-	}
+      that.g.append("g")
+        .selectAll("path")
+        .data(features)
+        .enter()
+        .append("path")
+        .attr("data-id", function(d) {
+          return d.id || d.properties.name;
+        })
+        .attr("class", function(d) {
+          return "clp-land clp-subunit " + (d.id ? fillColor(max, that.getValue(data, d.id)) : "");
+        })
+        .style("stroke-width", "1px")
+        .attr("d", path)
+        .on("click", that.onClick.bind(that))
+        .on("mouseover", function(d, i) {
+          this.parentNode.appendChild(this)
+        })
+        .call(tooltip.call(that, data,
+          function(d, i) { // replace with config
+            return "<b>" + d.properties.name + "</b><br/>" + that.valueName + ": " + that.getValue(data, d.id);
+          }
+        ));
 
-	function renderCountry(){
-		if(country === 'USA'){
-			beforeRender = function(){
-				self.projection = d3.geo.albersUsa()
-				.scale(1000).translate([width / 2, height / 1.7]);
-			}
-		} else if(country === 'RUS'){
-			beforeRender = function(){
-				self.projection = d3.geo.albers()
-					.rotate([-105, 0])
-				  .center([-10, 65])
-				  .parallels([52, 64])
-				  .scale(700)
-				  .translate([width / 2, height / 2]);
-			}
-			afterRender = function(){
-				var bounds = self.path().bounds(self.currentFeature)
-				var xyz = getXYZ(bounds, width, height);
-				self.g.attr("transform", "translate(" + self.projection.translate() + ")scale(" + xyz[2] + ")translate(-" + xyz[0] + ",-" + xyz[1] + ")")
-				.selectAll(["#countries", "#states", "#cities"])
-				.style("stroke-width", 1.0 / xyz[2] + "px")
-			}
-		}else {
-			afterRender = function(){
-				var bounds = self.path().bounds(self.currentFeature)
-				var xyz = getXYZ(bounds, width, height);
-				self.g.attr("transform", "translate(" + self.projection.translate() + ")scale(" + xyz[2] + ")translate(-" + xyz[0] + ",-" + xyz[1] + ")")
-				.selectAll(["#countries", "#states", "#cities"])
-				.style("stroke-width", 1.0 / xyz[2] + "px")
-			}
-		};
-		filePath = "geodata/" + country + "/states.topo.json";
-		id = "states";
-		features = function(topoData){return topojson.feature(topoData, topoData.objects.states).features};
-		className = "state "
-		d3.json(filePath, function(error, topoData) {
-			if (error) return console.error(error);
-			toggleLoader()
-			beforeRender();
+      that.g.attr("transform",
+        "translate(" + projection.translate() + ")scale(" + xyz[2] + ")translate(-" + xyz[0] + ",-" + xyz[1] + ")"
+      );
+    });
+  };
 
-			self.g.selectAll("g").remove();
-			self.g.append("g")
-			.attr("id", id)
-			.selectAll("path")
-			.data(features(topoData))
-			.enter()
-			.append("path")
-			.attr("id", function(d) { return d.id || d.properties.name; })
-			.attr("class", function(d) { return className + (d.id ? landFill(getValue(data, d.id)) : '');  })
-			.attr("d", self.path())
-			.on("click", self.onClick)
-			.on("mouseover", function(d,i){ this.parentNode.appendChild(this) })
-			.call(tooltip(
-        function(d, i){
-        	return "<b>"+ d.properties.name + "</b><br/>" + self.valueName + ": "+getValue(data,d.id);	
-        }
-       ));
+  function renderCountry() {
+    var that = this,
+      country = that.currentSelection.country,
+      projection;
+    if (country === "USA") {
+      projection = d3.geo.albersUsa()
+        .scale(1000)
+        .translate([width / 2, height / 2]);
+    } else if (country === "RUS") {
+      projection = d3.geo.mercator()
+        .rotate([-115, 0])
+        .translate([width / 2, height / 1.5]);
+    } else {
+      projection = d3.geo.mercator().scale(150).translate([width / 2, height / 1.5]);
+    }
 
-			afterRender();
-		});
-	}
+    d3.json(getFilePath.call(that, that.currentSelection), function(error, topoData) {
+      if (error) return console.error(error);
+      var features = topojson.feature(topoData, topoData.objects.states).features,
+        path = d3.geo.path().projection(projection),
+        bounds = path.bounds(that.currentFeature),
+        xyz = getXYZ(bounds),
+        data = that.get(that.currentSelection),
+        max = findMax.call(that, data);
 
-	function renderState(){
-		toggleLoader()
-		//NOTES:
-		// - (done) make sure that bigger cities are stacked behind smaller ones
-		// outlines or different colors will be req'd to differentiate
-		// - pull out stroke vals into set-able vars
-		// - rotate for alaska so it's not split
-		// - I don't understand how scaling only affects the circles (inversely)
-		// but not the rest of the map. wtf. 
+      that.toggleLoader();
+      that.g.selectAll("g").remove();
 
-		// remove old projection
-		self.g.select("#states").remove()
-		// change/ update projection
-		self.projection = d3.geo.mercator().scale(1000).translate([width / 2, height / 1.5]);
-		var bounds = self.path().bounds(self.currentFeature)
-		var xyz = getXYZ(bounds, width, height);
-		// sort so largest circles are beneath smaller ones
-		var sortedData = Object.keys(data).map(function(key){
-			data[key].id = key
-			return data[key];
-		}).sort(function(a,b){
-			return getValue(data,b) - getValue(data,a);
-		})
+      that.g.append("g")
+        .style("stroke-width", 1 / xyz[2] + "px")
+        .selectAll("path")
+        .data(features)
+        .enter()
+        .append("path")
+        .attr("data-id", function(d) {
+          return d.id || d.properties.name;
+        })
+        .attr("class", function(d) {
+          return "clp-land clp-subunit " + (d.id ? fillColor(max, that.getValue(data, d.id)) : "");
+        })
+        .attr("d", path)
+        .on("click", that.onClick.bind(that))
+        .on("mouseover", function(d, i) {
+          this.parentNode.appendChild(this)
+        })
+        .call(tooltip.call(that, data,
+          function(d, i) { // replace with config
+            return "<b>" + d.properties.name + "</b><br/>" + that.valueName + ": " + that.getValue(data, d.id);
+          }
+        ));
+      if (country !== "USA") {
+        that.g.attr("transform",
+          "translate(" + projection.translate() + ")scale(" + xyz[2] + ")translate(-" + xyz[0] + ",-" + xyz[1] + ")"
+        );
+      }
+    });
+  }
 
-		// add our selected state back
-		self.g.append("g")
-			.attr("id", id)
-			.selectAll("path")
-			.data([self.currentFeature])
-			.enter()
-			.append("path")
-			.attr("id", function(d) { return d.id || d.properties.name; })
-			.attr("class", 'active-land')
-			.attr("d", self.path())
-			.on("click", self.onClick);
+  function renderState() {
+    var that = this;
+    if (that.currentSelection.country === "USA" && that.currentSelection.state === "USA-3563") {
+      projection = d3.geo.mercator()
+        .rotate([15, 0])
+        .scale(1000)
+        .translate([width / 2, height / 1.5]);
+    } else {
+      projection = d3.geo.mercator().scale(1000).translate([width / 2, height / 1.5]);
+    }
+    var path = d3.geo.path().projection(projection),
+      bounds = path.bounds(that.currentFeature),
+      xyz = getXYZ(bounds),
+      data = that.get(that.currentSelection),
+      max = findMax.call(that, data),
+      // sort so largest circles are beneath smaller ones
+      sortedData = Object.keys(data).map(function(key) {
+        data[key].id = key // would overwrite that field if already set
+        return data[key];
+      }).sort(function(a, b) {
+        return that.getValue(data, b) - that.getValue(data, a);
+      })
+    that.toggleLoader();
+    that.g.selectAll("g").remove();
 
-		self.g.insert("g", "#loader")
-			.attr("id", "cities")
-			.selectAll(".city")
-			.data(sortedData)
-		.enter()
-			.append("circle")
-			.attr("r", function(d){ return cityFill(getValue(data,d.id)) })
-			.style("fill", "#FF9933" )
-			.style("stroke", "white")
-			.style("stroke-width", ".2px")
-			.attr("id", function(d){ return d.id })
-			.attr("class", "city")
-			.attr("transform", function(d) {
-			  return "translate(" + self.projection([ d.long, d.lat ]) + ")";
-			})
-			.on("click", self.onClick)
-			.call(tooltip(
-        function(d, i){
-          return "<b>"+ d.id + "</b><br/>" + self.valueName + ": " + getValue(data,d.id);
+    // add our selected state back
+    that.g.append("g")
+      .selectAll("path")
+      .data([that.currentFeature])
+      .enter()
+      .append("path")
+      .attr("data-id", function(d) {
+        return d.id || d.properties.name;
+      })
+      .attr("class", "clp-land")
+      .attr("d", path)
+      .style("stroke-width", 2 / xyz[2] + "px")
+      .on("click", that.onClick.bind(that));
+
+    that.g.append("g")
+      .selectAll(".city")
+      .data(sortedData)
+      .enter()
+      .append("circle")
+      .attr("r", function(d) {
+        return cityRadius(max, that.getValue(data, d.id))
+      })
+      .attr("data-id", function(d) {
+        return d.id
+      })
+      .attr("class", function(d) {
+        return "clp-city clp-subunit " + (d.id ? fillColor(max, that.getValue(data, d.id)) : "");
+      })
+      .style("stroke-width", 2 / xyz[2] + "px")
+      .attr("transform", function(d) {
+        return "translate(" + projection([d.long, d.lat]) + ")";
+      })
+      .on("click", that.onClick.bind(that))
+      .call(tooltip.call(that, data,
+        function(d, i) {
+          return "<b>" + d.id + "</b><br/>" + that.valueName + ": " + that.getValue(data, d.id);
         }
       ));
 
-		
-		self.g.attr("transform", "translate(" + self.projection.translate() + ")scale(" + xyz[2] + ")translate(" + -1*xyz[0] + "," + -1*xyz[1] + ")")
-			.selectAll("#states")
-			.style("stroke-width", 2 / xyz[2] + "px")
-	}
+    that.g.attr("transform",
+      "translate(" + projection.translate() + ")scale(" + xyz[2] + ")translate(" + -1 * xyz[0] + "," + -1 * xyz[1] + ")"
+    );
+  }
 
-	//// HELPER FUNCTIONS ////
+  function findMax(data) {
+    var that = this,
+      maxValue;
+    Object.keys(data).forEach(function(key) {
+      var val = that.getValue(data, key);
+      if (!maxValue || maxValue < val)
+        maxValue = val
+    })
+    return maxValue;
+  }
 
-	function toggleLoader(){
-		if(self.loader.style.display === "none")
-			self.loader.style.display = "block"
-		else
-			self.loader.style.display = "none"
-	}
+  function fillColor(max, value) {
+    if (value === 0)
+      return "clp-color-scale-0"
+    var fill = d3.scale.quantize()
+      .domain([0, max])
+      .range(d3.range(1, 6)
+        .map(function(i) {
+          return "clp-color-scale-" + i;
+        }));
+    return fill(value);
+  }
 
-	function tooltip(accessor){
-		// from http://bl.ocks.org/rveciana/5181105
-    return function(selection){
+  function cityRadius(max, value) {
+    var radius = d3.scale.quantize()
+      .domain([0, max])
+      .range(d3.range(1, 5, 0.5));
+    return radius(value);
+  }
+
+  function tooltip(data, accessor) {
+    var that = this;
+    // from http://bl.ocks.org/rveciana/5181105
+    return function(selection) {
       var tooltipDiv;
-      var bodyNode = d3.select('body').node();
-      selection.on("mouseover.tooltip", function(d, i){
-      	if(getValue(data,d.id) === 0){ return; }  		
-        // Clean up lost tooltips
-        d3.select('body').selectAll('div.tooltip').remove();
-        // Append tooltip
-        tooltipDiv = d3.select('body').append('div').attr('class', 'tooltip');
-        var absoluteMousePos = d3.mouse(bodyNode);
-        tooltipDiv.style('left', (absoluteMousePos[0] + 20)+'px')
-          .style('top', (absoluteMousePos[1] - 25)+'px')
-          .style('position', 'absolute') 
-          .style('z-index', 2);
-        // Add text using the accessor function
-        var tooltipText = accessor(d, i) || '';
-        // Crop text arbitrarily
-        //tooltipDiv.style('width', function(d, i){return (tooltipText.length > 80) ? '300px' : null;})
-        //    .html(tooltipText);
-      })
-      .on('mousemove.tooltip', function(d, i) {
-      	if(getValue(data,d.id) === 0){ return; }  		
-        // Move tooltip
-        var absoluteMousePos = d3.mouse(bodyNode);
-        tooltipDiv.style('left', (absoluteMousePos[0] + 10)+'px')
-          .style('top', (absoluteMousePos[1] - 15)+'px');
-        var tooltipText = accessor(d, i) || '';
-        tooltipDiv.html(tooltipText);
-      })
-      .on("mouseout.tooltip", function(d, i){
-      	if(getValue(data,d.id) === 0){ return; }  		
-        // Remove tooltip
-        tooltipDiv.remove();
-      });
-	  };
-	};
+      var bodyNode = d3.select("body").node();
+      selection.on("mouseover.tooltip", function(d, i) {
+          if (that.getValue(data, d.id) === 0) {
+            return;
+          }
+          // Clean up lost tooltips
+          d3.select("body").selectAll("div.clp-tooltip").remove();
+          // Append tooltip
+          tooltipDiv = d3.select("body").append("div").attr("class", "clp-tooltip");
+          var absoluteMousePos = d3.mouse(bodyNode);
+          tooltipDiv.style("left", (absoluteMousePos[0] + 20) + "px")
+            .style("top", (absoluteMousePos[1] - 25) + "px")
+            .style("position", "absolute")
+            .style("z-index", 2);
+          // Add text using the accessor function
+          var tooltipText = accessor(d, i) || "";
+        })
+        .on("mousemove.tooltip", function(d, i) {
+          if (that.getValue(data, d.id) === 0) {
+            return;
+          }
+          // Move tooltip
+          var absoluteMousePos = d3.mouse(bodyNode);
+          tooltipDiv.style("left", (absoluteMousePos[0] + 10) + "px")
+            .style("top", (absoluteMousePos[1] - 15) + "px");
+          var tooltipText = accessor(d, i) || "";
+          tooltipDiv.html(tooltipText);
+        })
+        .on("mouseout.tooltip", function(d, i) {
+          if (that.getValue(data, d.id) === 0) {
+            return;
+          }
+          // Remove tooltip
+          tooltipDiv.remove();
+        });
+    };
+  };
 
-	function getValue(data, key){
-		if(data[key] && data[key][self.valueName])
-			return data[key][self.valueName];
-		return 0;
-	}
+  function createLoader(centerHTML, parentEl) {
+    var loader = window.document.createElement("div");
+    loader.className = "clp-loader";
+    loader.style.display = "none";
 
-	// calculates scale for zooming into features
-	function getXYZ(bounds, width, height){
-		var w_scale = (bounds[1][0] - bounds[0][0]) / width;
-		var h_scale = (bounds[1][1] - bounds[0][1]) / height;
-		var z = .96 / Math.max(w_scale, h_scale);
-		var x = (bounds[1][0] + bounds[0][0]) / 2;
-		var y = (bounds[1][1] + bounds[0][1]) / 2 + (height / z / 6);
-		return [x, y, z];
-	};
+    var loaderCenter = window.document.createElement("div");
+    loaderCenter.className = "clp-loaderCenter";
+    loaderCenter.innerHTML = centerHTML || "";
 
-	// determines equality of two objects
-	function objectsAreEqual(firstObj, secondObj){
-		var firstObjKeys = Object.keys(firstObj),
-			secondObjKeys  = Object.keys(secondObj),
-			result = true;
-		if(firstObjKeys.length !== secondObjKeys.length){ return false }
-		for(var i = 0; i < firstObjKeys.length; i++){
-			var key = firstObjKeys[i],
-				firstObjVal  = firstObj[key],
-				secondObjVal = secondObj[key],
-				firstObjValType  = getType(firstObjVal),
-				secondObjValType = getType(secondObjVal);
-			if(firstObjValType !== secondObjValType){ result = false; }
-			if(['string', 'number', 'boolean'].indexOf(firstObjValType) !== -1){
-				result = firstObjVal === secondObjVal;
-			} else if(['object', 'array'].indexOf(firstObjValType) !== -1){
-				result = objectsAreEqual(firstObjVal, secondObjVal);
-			} else {
-				result = false;
-			}
-			if(result === false){ break; }
-		};
-		return result; //Boolean
-	};
+    loader.appendChild(loaderCenter);
+    parentEl.appendChild(loader);
+    return loader;
+  }
 
-	// returns an object's type
-	function getType(o) {
-		if (typeof o != 'object')
-			return typeof o;
-		if (o === null)
-			return 'null';
-	  //object, array, function, date, regexp, string, number, boolean, error
-	  var internalClass = Object.prototype.toString.call(o)
-	  .match(/\[object\s(\w+)\]/)[1];
-	  return internalClass.toLowerCase(); //String
-	};
+  function getFilePath(selection) {
+    var zoom = selection.zoom,
+      path = this.filePath[zoom]
+    if (zoom === "country")
+      return path.replace(/\[country\]/, selection.country)
+    return path;
+  }
 
-	if(typeof(d3) === 'undefined'){
-		console.log("Choropleth requires d3: http://d3js.org");
-	}else if(typeof($) === 'undefined'){
-		console.log("Choropleth requires jQuery: http://jquery.org");
-	}else{
-		if(typeof(window.Choropleth) === 'undefined'){
-			window.Choropleth = Choropleth;
-		}else{
-			console.log("Choropleth already defined.");
-		}
-	};
+  function getXYZ(bounds) {
+    var w_scale = (bounds[1][0] - bounds[0][0]) / width;
+    var h_scale = (bounds[1][1] - bounds[0][1]) / height;
+    var z = .96 / Math.max(w_scale, h_scale);
+    var x = (bounds[1][0] + bounds[0][0]) / 2;
+    var y = (bounds[1][1] + bounds[0][1]) / 2 + (height / z / 6);
+    return [x, y, z];
+  }
+
+  function objectsAreEqual(firstObj, secondObj) {
+    if (!firstObj || !secondObj) {
+      return false;
+    }
+    var firstObjKeys = Object.keys(firstObj),
+      secondObjKeys = Object.keys(secondObj),
+      result = true;
+    if (firstObjKeys.length !== secondObjKeys.length) {
+      return false;
+    }
+    for (var i = 0; i < firstObjKeys.length; i++) {
+      var key = firstObjKeys[i],
+        firstObjVal = firstObj[key],
+        secondObjVal = secondObj[key],
+        firstObjValType = getType(firstObjVal),
+        secondObjValType = getType(secondObjVal);
+      if (firstObjValType !== secondObjValType) {
+        result = false;
+      }
+      if (["string", "number", "boolean"].indexOf(firstObjValType) !== -1) {
+        result = firstObjVal === secondObjVal;
+      } else if (["object", "array"].indexOf(firstObjValType) !== -1) {
+        result = objectsAreEqual(firstObjVal, secondObjVal);
+      } else {
+        result = false;
+      }
+      if (result === false) {
+        break;
+      }
+    };
+    return result; //Boolean
+  }
+
+  function getType(obj) {
+    if (typeof obj !== "object")
+      return typeof obj;
+    if (obj === null)
+      return "null";
+    //object, array, function, date, regexp, string, number, boolean, error
+    var internalClass = Object.prototype.toString.call(obj)
+      .match(/\[object\s(\w+)\]/)[1];
+    return internalClass.toLowerCase();
+  }
+
+  if (typeof(d3) === "undefined") {
+    console.log("Choropleth requires d3: http://d3js.org");
+  } else if (typeof($) === "undefined") {
+    console.log("Choropleth requires jQuery: http://jquery.org");
+  } else if (typeof(topojson) === "undefined") {
+    console.log("Choropleth requires topojson: https://github.com/mbostock/topojson");
+  } else {
+    if (typeof(window.Choropleth) === "undefined") {
+      window.Choropleth = Choropleth;
+    } else {
+      console.log("Choropleth already defined.");
+    }
+  };
 })(window, d3, topojson, $);
-
-// dataObj = {
-// 	"world": {
-// 		"value": 1, 
-// 		"children": {
-// 			"USA": {
-// 				"value": 717,
-// 				"children": {
-// 					"CA": {
-// 						"value": 200,
-// 						"children": {
-// 							"San Francisco": { "value": 70 }, 
-// 							"Los Angeles": { "value": 36 }, 
-// 							"San Diego": { "value": 5 }
-// 						}
-// 					},
-// 					"PA": {
-// 						"value": 175,
-// 						"children": {
-// 							"Philadelphia": { "value": 14 }
-// 						}
-// 					}
-// 				}
-// 			}
-// 		}
-// 	}
-// }
