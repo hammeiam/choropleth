@@ -1,11 +1,11 @@
-(function(window, d3, topojson, $) {
+(function(window, d3, topojson) {
   //////// READ-ONLY VARS ////////
   var defaultConfig = {
     onClick: function() {
       console.log("No onClick defined")
     },
     valueName: "value",
-    mapSelector: "#map",
+    mapSelector: "map",
     dataStore: null, // consider something else for this
     currentSelection: {
       zoom: "world"
@@ -31,7 +31,7 @@
     this.mapSelector = config.mapSelector;
     this.externalOnClick = config.onClick;
     this.currentSelection = config.currentSelection;
-    this.el = window.document.getElementById(this.mapSelector.slice(1));
+    this.el = window.document.getElementById(this.mapSelector);
     this.loader = createLoader(config.loadingHTML, this.el); // may need to bind
     this.filePath = config.filePath;
 
@@ -50,12 +50,13 @@
 
     if (that.firstRender) {
       // double check that we can use global read vars here
-      var svg = d3.select(that.mapSelector).insert("svg", ":first-child")
+      var elWidth = document.getElementById(that.mapSelector).clientWidth;
+      var svg = d3.select("#" + that.mapSelector).insert("svg", ":first-child")
         .attr("class", "clp-svg")
         .attr("preserveAspectRatio", "xMidYMid")
         .attr("viewBox", "0 0 " + width + " " + height)
-        .attr("width", $(that.mapSelector).width())
-        .attr("height", $(that.mapSelector).width() * height / width);
+        .attr("width", elWidth)
+        .attr("height", elWidth * height / width);
 
       svg.append("rect")
         .attr("class", "clp-background")
@@ -65,11 +66,13 @@
 
       that.g = svg.append("g");
 
-      $(window).resize(function() {
-        var w = $(that.mapSelector).width();
+      var oldOnResizeFn = window.onresize;
+      window.onresize = function(){
+        var w = document.getElementById(that.mapSelector).clientWidth;
         svg.attr("width", w);
         svg.attr("height", w * height / width);
-      });
+        if(oldOnResizeFn){ oldOnResizeFn(); }
+      }
       that.firstRender = false;
     };
 
@@ -480,8 +483,6 @@
 
   if (typeof(d3) === "undefined") {
     console.log("Choropleth requires d3: http://d3js.org");
-  } else if (typeof($) === "undefined") {
-    console.log("Choropleth requires jQuery: http://jquery.org");
   } else if (typeof(topojson) === "undefined") {
     console.log("Choropleth requires topojson: https://github.com/mbostock/topojson");
   } else {
@@ -491,4 +492,4 @@
       console.log("Choropleth already defined.");
     }
   };
-})(window, d3, topojson, $);
+})(window, d3, topojson);
