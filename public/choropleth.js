@@ -304,7 +304,7 @@
       .on("click", that.onClick.bind(that));
 
     that.g.append("g")
-      .selectAll(".city")
+      .selectAll(".clp-city")
       .data(sortedData)
       .enter()
       .append("circle")
