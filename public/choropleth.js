@@ -89,11 +89,12 @@
   Choropleth.prototype.insert = function(newData, selection) {
     var zoomLevels = ["world", "country", "state"],
       zoomIndex = zoomLevels.indexOf(selection.zoom),
-      dataObj = this.dataStore;
+      dataObj = this.dataStore,
+      that = this;
     selection.world = "world";
     for (var i = 0; i <= zoomIndex; i++) {
       var zoomLevel = zoomLevels[i],
-        zoomItem = selection[zoomLevel];
+        zoomItem = zoomLevel === "world" ? "world" : selection[zoomLevel]["name"];
       if (!dataObj) {
         dataObj = {};
       }
@@ -107,22 +108,20 @@
     }
     Object.keys(newData).forEach(function(key) {
       dataObj[key] = newData[key];
+      dataObj[key][that.valueName] = parseFloat(dataObj[key][that.valueName],10);
     });
     return dataObj;
   };
 
   Choropleth.prototype.get = function(selection) {
-    selection = selection || {
-      "zoom": "world"
-    };
+    selection = selection || { "zoom": "world" };
     // only returns children because in a choropleth, we only care about the sub-unit's values
     var zoomLevels = ["world", "country", "state"],
       zoomIndex = zoomLevels.indexOf(selection.zoom),
       dataObj = this.dataStore;
-    selection.world = "world";
     for (var i = 0; i <= zoomIndex; i++) {
       var zoomLevel = zoomLevels[i],
-        zoomItem = selection[zoomLevel];
+        zoomItem = zoomLevel === "world" ? "world" : selection[zoomLevel]["name"];
       if (!dataObj || !dataObj[zoomItem] || !dataObj[zoomItem]["children"]) {
         return null;
       }
@@ -144,7 +143,10 @@
     // if we clicked a valid feature AND we can zoom closer
     if (featureData && zoom !== "state") {
       var smallerUnit = zoom === "world" ? "country" : "state";
-      newSelection[smallerUnit] = featureData.id;
+      newSelection[smallerUnit] = {
+        name: featureData.properties.name,
+        id: featureData.id
+      }; // UNIQID
       newSelection.zoom = smallerUnit;
       this.currentFeature = featureData; // may not ever be used
     } else {
@@ -186,7 +188,7 @@
           return d.id || d.properties.name;
         })
         .attr("class", function(d) {
-          return "clp-land clp-subunit " + (d.id ? fillColor(max, that.getValue(data, d.id)) : "");
+          return "clp-land clp-subunit " + (d.properties.name ? fillColor(max, that.getValue(data, d.properties.name)) : "");
         })
         .style("stroke-width", "1px")
         .attr("d", path)
@@ -196,7 +198,7 @@
         })
         .call(tooltip.call(that, data,
           function(d, i) { // replace with config
-            return "<b>" + d.properties.name + "</b><br/>" + that.valueName + ": " + that.getValue(data, d.id);
+            return "<b>" + d.properties.name + "</b><br/>" + that.valueName + ": " + that.getValue(data, d.properties.name);
           }
         ));
 
@@ -208,7 +210,7 @@
 
   function renderCountry() {
     var that = this,
-      country = that.currentSelection.country,
+      country = that.currentSelection.country.id,
       projection;
     if (country === "USA") {
       projection = d3.geo.albersUsa()
@@ -244,7 +246,7 @@
           return d.id || d.properties.name;
         })
         .attr("class", function(d) {
-          return "clp-land clp-subunit " + (d.id ? fillColor(max, that.getValue(data, d.id)) : "");
+          return "clp-land clp-subunit " + (d.properties.name ? fillColor(max, that.getValue(data, d.properties.name)) : "");
         })
         .attr("d", path)
         .on("click", that.onClick.bind(that))
@@ -253,7 +255,7 @@
         })
         .call(tooltip.call(that, data,
           function(d, i) { // replace with config
-            return "<b>" + d.properties.name + "</b><br/>" + that.valueName + ": " + that.getValue(data, d.id);
+            return "<b>" + d.properties.name + "</b><br/>" + that.valueName + ": " + that.getValue(data, d.properties.name);
           }
         ));
       if (country !== "USA") {
@@ -266,7 +268,7 @@
 
   function renderState() {
     var that = this;
-    if (that.currentSelection.country === "USA" && that.currentSelection.state === "USA-3563") {
+    if (that.currentSelection.country.id === "USA" && that.currentSelection.state.id === "USA-3563") {
       projection = d3.geo.mercator()
         .rotate([15, 0])
         .scale(1000)
@@ -334,8 +336,7 @@
   }
 
   function findMax(data) {
-    var that = this,
-      maxValue;
+    var that = this, maxValue;
     Object.keys(data).forEach(function(key) {
       var val = that.getValue(data, key);
       if (!maxValue || maxValue < val)
@@ -424,7 +425,7 @@
     var zoom = selection.zoom,
       path = this.filePath[zoom]
     if (zoom === "country")
-      return path.replace(/\[country\]/, selection.country)
+      return path.replace(/\[country\]/, selection.country.id)
     return path;
   }
 
