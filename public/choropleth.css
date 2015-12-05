@@ -1,0 +1,64 @@
+.clp-loader {
+  background-color: #bae4b3;
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  opacity: .8;
+}
+.clp-loader .clp-loaderCenter {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+}
+.clp-background {
+  fill: white;
+  pointer-events: all;
+}
+.clp-land {
+  fill: #d4d8d4;
+  stroke: #aaa;
+}
+.clp-subunit:hover {
+  stroke: #555;
+}
+.clp-city {
+  fill: rgb(255, 153, 51);
+  stroke: white;
+}
+.clp-city.clp-color-scale-1 {
+  stroke: grey;
+}
+.clp-city.clp-color-scale-2 {
+  stroke: grey;
+}
+.clp-tooltip{ 
+  background-color:whitesmoke;
+  margin: 10px;
+  min-height: 50px;
+  width: 180px;
+  padding:5px;
+  border: 2px solid lightgrey;
+}
+
+.clp-color-scale-0 {
+  fill: #d4d8d4;
+}
+.clp-color-scale-1 {
+  fill: #ffffcc;
+}
+.clp-color-scale-2 {
+  fill: #c2e699;
+} 
+.clp-color-scale-3 {
+  fill: #78c679;
+}
+.clp-color-scale-4 {
+  fill: #31a354;
+}
+.clp-color-scale-5 {
+  fill: #006837;
+}
