@@ -43,7 +43,6 @@ var choropleth = new Choropleth({
     var info = this.get(selection);
     if(info){
       this.render(selection);
-      updateTable(info);
     } else {
       // ajax request
       // this.insert(ajaxResponse, selection);
