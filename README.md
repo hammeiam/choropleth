@@ -24,7 +24,7 @@ State View:
 ```
 > **Step 2: Make topojson files publicly available**
 
-> Just copy the [public/geodata](public/geodata) directory from this project into your site's public folder. You can change where Choropleth will look for these files in the `filepath` config passed to the Choropleth instance.
+> I will make a set of topojson files available through this project. You can change where Choropleth will look for these files in the `filepath` config passed to the Choropleth instance.
 
 > **Step 3: Place a div on the page**
 ```html
