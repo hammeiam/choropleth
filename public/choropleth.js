@@ -6,7 +6,7 @@
     },
     valueName: "value",
     mapSelector: "map",
-    dataStore: null, // consider something else for this
+    dataStore: {},
     currentSelection: {
       zoom: "world"
     },
@@ -32,7 +32,7 @@
     this.externalOnClick = config.onClick;
     this.currentSelection = config.currentSelection;
     this.el = window.document.getElementById(this.mapSelector);
-    this.loader = createLoader(config.loadingHTML, this.el); // may need to bind
+    this.loader = createLoader(config.loadingHTML, this.el);
     this.filePath = config.filePath;
 
     var that = this;
@@ -44,46 +44,21 @@
 
   //////// PUBLIC FUNCTIONS ////////
   Choropleth.prototype.render = function(selection) {
-    var that = this,
-      zoom = selection["zoom"];
-    that.currentSelection = selection;
+    var zoom = selection["zoom"];
+    this.currentSelection = selection;
 
-    if (that.firstRender) {
-      // double check that we can use global read vars here
-      var elWidth = document.getElementById(that.mapSelector).clientWidth;
-      var svg = d3.select("#" + that.mapSelector).insert("svg", ":first-child")
-        .attr("class", "clp-svg")
-        .attr("preserveAspectRatio", "xMidYMid")
-        .attr("viewBox", "0 0 " + width + " " + height)
-        .attr("width", elWidth)
-        .attr("height", elWidth * height / width);
-
-      svg.append("rect")
-        .attr("class", "clp-background")
-        .attr("width", width)
-        .attr("height", height)
-        .on("click", that.onClick.bind(that));
-
-      that.g = svg.append("g");
-
-      var oldOnResizeFn = window.onresize;
-      window.onresize = function(){
-        var w = document.getElementById(that.mapSelector).clientWidth;
-        svg.attr("width", w);
-        svg.attr("height", w * height / width);
-        if(oldOnResizeFn){ oldOnResizeFn(); }
-      }
-      that.firstRender = false;
-    };
+    if (this.firstRender){
+      onFirstRender.call(this)
+    }
 
     d3.selectAll(".clp-tooltip").remove()
 
     if (zoom === "world") {
-      renderWorld.call(that);
+      renderWorld.call(this);
     } else if (zoom === "country") {
-      renderCountry.call(that);
+      renderCountry.call(this);
     } else if (zoom === "state") {
-      renderState.call(that);
+      renderState.call(this);
     }
   }
   Choropleth.prototype.insert = function(newData, selection) {
@@ -164,6 +139,34 @@
   };
 
   //////// PRIVATE FUNCTIONS ////////
+  function onFirstRender(){
+    var that = this;
+    var elWidth = document.getElementById(that.mapSelector).clientWidth;
+    var svg = d3.select("#" + that.mapSelector).insert("svg", ":first-child")
+      .attr("class", "clp-svg")
+      .attr("preserveAspectRatio", "xMidYMid")
+      .attr("viewBox", "0 0 " + width + " " + height)
+      .attr("width", elWidth)
+      .attr("height", elWidth * height / width);
+
+    svg.append("rect")
+      .attr("class", "clp-background")
+      .attr("width", width)
+      .attr("height", height)
+      .on("click", that.onClick.bind(that));
+
+    that.g = svg.append("g");
+
+    var oldOnResizeFn = window.onresize;
+    window.onresize = function(){
+      var w = document.getElementById(that.mapSelector).clientWidth;
+      svg.attr("width", w);
+      svg.attr("height", w * height / width);
+      if(oldOnResizeFn){ oldOnResizeFn(); }
+    }
+    that.firstRender = false;
+  }
+
   function renderWorld() {
     var that = this;
     d3.json(getFilePath.call(that, that.currentSelection), function(error, topoData) {
