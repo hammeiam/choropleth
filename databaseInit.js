@@ -3,11 +3,10 @@ var request = require('request');
 var csv = require('csv');
 var fs = require('fs');
 var connectionString = process.env.DATABASE_URL || 'postgres://localhost:5432/choroplethdata';
-var googleKey = process.env.GOOGLE_KEY || 'googlekey'
 
 var client = new pg.Client(connectionString);
 client.connect();
-var createDB = client.query('CREATE TABLE locations (id SERIAL PRIMARY KEY, lat varchar(255), long varchar(255), country varchar(255), state varchar(255), city varchar(255))');
+var createDB = client.query('CREATE TABLE locations (id SERIAL PRIMARY KEY, lat float, long float, country varchar(255), state varchar(255), city varchar(255))');
 
 // given a location object from Google Geocoder
 // return an object containing the 5 fields we care about
@@ -94,12 +93,9 @@ var requestFn = rateLimit(function(url, isLast){
   })
 })
 
-// build url for google geocoder request
-var baseRequestString = "https://maps.googleapis.com/maps/api/geocode/json?";
-baseRequestString += "location_type=ROOFTOP";
-baseRequestString += "&language=en";
-baseRequestString += "&key=" + googleKey;
-var latLong, url;
+// url for google geocoder request
+var baseRequestString = "https://maps.googleapis.com/maps/api/geocode/json?language=en";
+var latLong, url, isLast;
 
 // parse csv. For each location, query the geocoder, store result in DB
 fs.readFile('private/locationLatLongs.csv', function(err, file){
@@ -108,8 +104,8 @@ fs.readFile('private/locationLatLongs.csv', function(err, file){
       console.log('Looking at ', i)
       latLong = output[i][0] + ',' + output[i][1];
       url = baseRequestString + "&latlng=" + latLong;
-      requestFn(url, i === output.length - 1);
+      isLast = i === output.length - 1;
+      requestFn(url, isLast);
     }
   })
 })
-

@@ -174,7 +174,9 @@
         path = d3.geo.path().projection(projection),
         xyz = [width / 2, height / 1.5, 1],
         data = that.get(that.currentSelection),
-        max = findMax.call(that, data);
+        minMax = findMinAndMax.call(that, data),
+        min = minMax[0],
+        max = minMax[1];
 
       that.toggleLoader();
       that.g.selectAll("g").remove();
@@ -188,7 +190,7 @@
           return d.id || d.properties.name;
         })
         .attr("class", function(d) {
-          return "clp-land clp-subunit " + (d.properties.name ? fillColor(max, that.getValue(data, d.properties.name)) : "");
+          return "clp-land clp-subunit " + (d.properties.name ? fillColor(min, max, that.getValue(data, d.properties.name)) : "");
         })
         .style("stroke-width", "1px")
         .attr("d", path)
@@ -231,7 +233,9 @@
         bounds = path.bounds(that.currentFeature),
         xyz = getXYZ(bounds),
         data = that.get(that.currentSelection),
-        max = findMax.call(that, data);
+        minMax = findMinAndMax.call(that, data),
+        min = minMax[0],
+        max = minMax[1];
 
       that.toggleLoader();
       that.g.selectAll("g").remove();
@@ -246,7 +250,7 @@
           return d.id || d.properties.name;
         })
         .attr("class", function(d) {
-          return "clp-land clp-subunit " + (d.properties.name ? fillColor(max, that.getValue(data, d.properties.name)) : "");
+          return "clp-land clp-subunit " + (d.properties.name ? fillColor(min, max, that.getValue(data, d.properties.name)) : "");
         })
         .attr("d", path)
         .on("click", that.onClick.bind(that))
@@ -274,20 +278,25 @@
         .scale(1000)
         .translate([width / 2, height / 1.5]);
     } else {
-      projection = d3.geo.mercator().scale(1000).translate([width / 2, height / 1.5]);
+      projection = d3.geo.mercator()
+        .scale(1000)
+        .translate([width / 2, height / 1.5]);
     }
     var path = d3.geo.path().projection(projection),
       bounds = path.bounds(that.currentFeature),
       xyz = getXYZ(bounds),
       data = that.get(that.currentSelection),
-      max = findMax.call(that, data),
+      minMax = findMinAndMax.call(that, data),
+      min = minMax[0],
+      max = minMax[1],
       // sort so largest circles are beneath smaller ones
       sortedData = Object.keys(data).map(function(key) {
-        data[key].id = key // would overwrite that field if already set
+        data[key].clpId = key // would overwrite that field if already set
         return data[key];
       }).sort(function(a, b) {
-        return that.getValue(data, b) - that.getValue(data, a);
+        return that.getValue(data, b.clpId) - that.getValue(data, a.clpId);
       })
+
     that.toggleLoader();
     that.g.selectAll("g").remove();
 
@@ -311,13 +320,13 @@
       .enter()
       .append("circle")
       .attr("r", function(d) {
-        return cityRadius(max, that.getValue(data, d.id))
+        return (cityRadius(min, max, that.getValue(data, d.clpId)) / xyz[2])
       })
       .attr("data-id", function(d) {
-        return d.id
+        return d.clpId
       })
       .attr("class", function(d) {
-        return "clp-city clp-subunit " + (d.id ? fillColor(max, that.getValue(data, d.id)) : "");
+        return "clp-city clp-subunit " + (d.clpId ? fillColor(min, max, that.getValue(data, d.clpId)) : "");
       })
       .style("stroke-width", 2 / xyz[2] + "px")
       .attr("transform", function(d) {
@@ -326,30 +335,35 @@
       .on("click", that.onClick.bind(that))
       .call(tooltip.call(that, data,
         function(d, i) {
-          return "<b>" + d.id + "</b><br/>" + that.valueName + ": " + that.getValue(data, d.id);
+          return "<b>" + d.clpId + "</b><br/>" + that.valueName + ": " + that.getValue(data, d.clpId);
         }
       ));
-
+    console.log(xyz[2])
     that.g.attr("transform",
       "translate(" + projection.translate() + ")scale(" + xyz[2] + ")translate(" + -1 * xyz[0] + "," + -1 * xyz[1] + ")"
     );
+
   }
 
-  function findMax(data) {
-    var that = this, maxValue;
+  function findMinAndMax(data) {
+    var that = this, maxValue, minValue;
     Object.keys(data).forEach(function(key) {
       var val = that.getValue(data, key);
       if (!maxValue || maxValue < val)
         maxValue = val
+      if (!minValue || minValue > val)
+        minValue = val
     })
-    return maxValue;
+    return [minValue, maxValue];
   }
 
-  function fillColor(max, value) {
+  function fillColor(min, max, value) {
     if (value === 0)
-      return "clp-color-scale-0"
+      return "clp-color-scale-0";
+    else if (value === min)
+      return "clp-color-scale-1";
     var fill = d3.scale.quantize()
-      .domain([0, max])
+      .domain([min, max])
       .range(d3.range(1, 6)
         .map(function(i) {
           return "clp-color-scale-" + i;
@@ -357,10 +371,12 @@
     return fill(value);
   }
 
-  function cityRadius(max, value) {
+  function cityRadius(min, max, value) {
+    if (value === min)
+      return 15;
     var radius = d3.scale.quantize()
-      .domain([0, max])
-      .range(d3.range(1, 5, 0.5));
+      .domain([min, max])
+      .range(d3.range(10, 50, 5));
     return radius(value);
   }
 
@@ -371,7 +387,7 @@
       var tooltipDiv;
       var bodyNode = d3.select("body").node();
       selection.on("mouseover.tooltip", function(d, i) {
-          if (that.getValue(data, d.id) === 0) {
+          if (that.getValue(data, d.properties.name) === 0) {
             return;
           }
           // Clean up lost tooltips
@@ -387,7 +403,7 @@
           var tooltipText = accessor(d, i) || "";
         })
         .on("mousemove.tooltip", function(d, i) {
-          if (that.getValue(data, d.id) === 0) {
+          if (that.getValue(data, d.properties.name) === 0) {
             return;
           }
           // Move tooltip
@@ -398,7 +414,7 @@
           tooltipDiv.html(tooltipText);
         })
         .on("mouseout.tooltip", function(d, i) {
-          if (that.getValue(data, d.id) === 0) {
+          if (that.getValue(data, d.properties.name) === 0) {
             return;
           }
           // Remove tooltip

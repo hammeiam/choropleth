@@ -2,9 +2,9 @@
 <html>
 <head>
 	<title></title>
-	<script src="http://d3js.org/d3.v3.min.js"></script>
-	<script src="http://d3js.org/topojson.v1.min.js"></script>
-	<script src="https://code.jquery.com/jquery-2.1.4.js"></script>
+	<script src="d3.min.js"></script>
+	<script src="topojson.min.js"></script>
+	<script src="jquery.min.js"></script>
 	<script src="choropleth.js"></script>
 	<style type="text/css">
 		*{
@@ -142,7 +142,7 @@
 			$table.empty();
 			$.each(data,function(key, value){
 				// USA: {value: 1, children: {}}
-				console.log(key, value)
+				// console.log(key, value)
 				if(!value['value']){ return; }
 				var domStr = '';
 				domStr += "<div class='row'>"
@@ -161,22 +161,20 @@
 			loadingHTML: '<div class="coolSpinner"></div>',
 			onClick: function(selection){
 				// {zoom: 'state', country: 'USA', state: 'CA'}
-				var self = this;
-				var info = self.get(selection);
+				var that = this;
+				var info = that.get(selection);
 				if(info){
-					self.render(selection);
+					that.render(selection);
 					updateTable(info);
 				} else {
 					$.ajax({
 						url: "/geodata",
 						data: selection,
 						dataType: 'json',
-						success: function(data){
-							// data = {'San Francisco': 4, 'Los Angeles': 10, 'San Diego': 3}
-							
-							self.insert(data, selection);
-							self.render(selection);
-							updateTable(self.get(selection));
+						success: function(data){							
+							that.insert(data, selection);
+							that.render(selection);
+							updateTable(that.get(selection));
 						}
 					});
 				};

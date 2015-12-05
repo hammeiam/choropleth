@@ -35,7 +35,7 @@ app.get('/geodata', function(req, res) {
         query = client.query(sqlString, [selection.country.name]);
 
       } else if(selection.zoom === 'state'){
-        sqlString = "select agg_table.count, locations.city, min(lat) as lat, min(long) as long " 
+        sqlString = "select agg_table.count, locations.city, round(avg(lat),8) as lat, round(avg(long),8) as long " 
         sqlString += "from locations ";
         sqlString += "join (select count(id) as count, city "; 
         sqlString += "from locations "; 
