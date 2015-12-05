@@ -46,7 +46,7 @@ var choropleth = new Choropleth({
       updateTable(info);
     } else {
       // ajax request
-      // this.render(ajaxResponse, selection);
+      // this.insert(ajaxResponse, selection);
       // this.render(selection);
     };
   }
