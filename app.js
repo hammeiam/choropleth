@@ -35,18 +35,18 @@ app.get('/geodata', function(req, res) {
         query = client.query(sqlString, [selection.country.name]);
 
       } else if(selection.zoom === 'state'){
-        sqlString = "select agg_table.count, locations.city, round(avg(lat),8) as lat, round(avg(long),8) as long " 
+        sqlString = "select agg_table.count, locations.city, round(avg(lat)::numeric,8) as lat, round(avg(long)::numeric,8) as long " 
         sqlString += "from locations ";
-        sqlString += "join (select count(id) as count, city "; 
-        sqlString += "from locations "; 
-        sqlString += "where country=$1 "; 
+        sqlString += "join (select count(id) as count, city ";
+        sqlString += "from locations ";
+        sqlString += "where country=$1 ";
         sqlString += "and state=$2 ";
-        sqlString += "group by city) agg_table "; 
+        sqlString += "group by city) agg_table ";
         sqlString += "on agg_table.city = locations.city ";
         sqlString += "group by locations.city, agg_table.count";
         query = client.query(sqlString, [selection.country.name, selection.state.name]);
 
-      } else 
+      } else
         res.send({})
 
       query.on('row', function(row){

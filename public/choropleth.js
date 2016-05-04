@@ -36,7 +36,7 @@
     this.filePath = config.filePath;
 
     var that = this;
-    // we invoke externalOnClick at construction to fetch and render 
+    // we invoke externalOnClick at construction to fetch and render
     (function() {
       that.onClick();
     })()
@@ -295,6 +295,7 @@
       // sort so largest circles are beneath smaller ones
       sortedData = Object.keys(data).map(function(key) {
         data[key].clpId = key // would overwrite that field if already set
+        data[key]['properties'] = {name: key} // this is cheating and should be removed
         return data[key];
       }).sort(function(a, b) {
         return that.getValue(data, b.clpId) - that.getValue(data, a.clpId);
@@ -375,11 +376,11 @@
   }
 
   function cityRadius(min, max, value) {
-    if (value === min)
+    if (max === min && value === min)
       return 15;
     var radius = d3.scale.quantize()
       .domain([min, max])
-      .range(d3.range(10, 50, 5));
+      .range(d3.range(10, 43, 8));
     return radius(value);
   }
 
