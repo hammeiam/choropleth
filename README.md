@@ -56,3 +56,5 @@ var choropleth = new Choropleth({
 
 ### Current status: alpha
 > I have a rough cut finished, but there are still features to add and fairly major bugs to fix. I'd also like to refactor the whole thing in ES6 and Webpack, and maybe release it on npm. Overall, I'd say it's about 70% to beta. 
+
+[![ghit.me](https://ghit.me/badge.svg?repo=hammeiam/choropleth)](https://ghit.me/repo/hammeiam/choropleth)
